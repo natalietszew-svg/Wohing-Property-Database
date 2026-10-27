@@ -13,6 +13,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
 
+  <!-- Supabase JS Client SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
     tailwind.config = {
       theme: {
@@ -118,7 +121,7 @@
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
         <div>
           <p class="text-xs font-semibold text-slate-500 uppercase">總樓盤數 Total Listings</p>
-          <p id="stat-total" class="text-2xl font-bold text-slate-800">10</p>
+          <p id="stat-total" class="text-2xl font-bold text-slate-800">0</p>
         </div>
         <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
           <i class="fa-solid fa-building"></i>
@@ -127,7 +130,7 @@
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
         <div>
           <p class="text-xs font-semibold text-slate-500 uppercase">現正出售 Active Sale</p>
-          <p id="stat-sale" class="text-2xl font-bold text-emerald-600">8</p>
+          <p id="stat-sale" class="text-2xl font-bold text-emerald-600">0</p>
         </div>
         <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
           <i class="fa-solid fa-tags"></i>
@@ -136,7 +139,7 @@
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
         <div>
           <p class="text-xs font-semibold text-slate-500 uppercase">現正出租 Active Rent</p>
-          <p id="stat-rent" class="text-2xl font-bold text-amber-600">2</p>
+          <p id="stat-rent" class="text-2xl font-bold text-amber-600">0</p>
         </div>
         <div class="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-lg">
           <i class="fa-solid fa-key"></i>
@@ -145,7 +148,7 @@
       <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
         <div>
           <p class="text-xs font-semibold text-slate-500 uppercase">平均實呎價 Avg Saleable $</p>
-          <p id="stat-avgprice" class="text-2xl font-bold text-indigo-600">$16,840</p>
+          <p id="stat-avgprice" class="text-2xl font-bold text-indigo-600">$0</p>
         </div>
         <div class="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg">
           <i class="fa-solid fa-chart-line"></i>
@@ -236,7 +239,7 @@
             <span><kbd class="bg-slate-700 text-white px-1.5 py-0.5 rounded text-[10px]">F5</kbd> 表格3/5</span>
             <span><kbd class="bg-slate-700 text-white px-1.5 py-0.5 rounded text-[10px]">F8</kbd> 相片庫</span>
           </div>
-          <div id="showing-count" class="text-slate-400">顯示 10 個樓盤中的 10 個</div>
+          <div id="showing-count" class="text-slate-400">顯示 0 個樓盤</div>
         </div>
       </div>
     </section>
@@ -563,8 +566,13 @@
 
   <!-- SCRIPT ENGINE -->
   <script>
-    // PRE-LOADED REALISTIC DATASET (10 Properties in Sai Kung & Clear Water Bay)
-    let properties = [
+    // Initialize Supabase Client
+    const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co'; // <--- Replace with your actual project URL from Supabase
+    const SUPABASE_ANON_KEY = 'sb_publishable_jVBNce5laZHb_DYcvcE4lg_giGTTHxq';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // DEFAULT DATASET (Used to auto-seed if database is empty)
+    const defaultProperties = [
       {
         id: "SK-001",
         ref: "SK-001",
@@ -650,7 +658,7 @@
         block: "A座",
         floor: "二樓連天台",
         unit: "Top Floor + Roof",
-        price: 0.038, // 38,000 Rent
+        price: 0.038,
         grossArea: 700,
         saleableArea: 700,
         view: "清水灣綠化山景 (Greenery View)",
@@ -722,7 +730,7 @@
         block: "--",
         floor: "地下 G/F",
         unit: "1號舖",
-        price: 0.085, // 85,000 Rent
+        price: 0.085,
         grossArea: 1200,
         saleableArea: 950,
         view: "大街人流旺 (High Foot Traffic Street)",
@@ -809,16 +817,87 @@
       }
     ];
 
+    let properties = [];
     let currentEAAFormType = 'form3';
 
-    // INITIALIZATION ON PAGE LOAD
-    window.onload = function() {
-      updateDashboardStats();
-      renderListings();
-      populateEAADropdown();
+    // INITIALIZATION ON PAGE LOAD (FETCH FROM CLOUD & AUTO-SEED IF EMPTY)
+    window.onload = async function() {
+      await fetchPropertiesFromCloud();
+      setupRealtimeSync();
       runMortgageCalc();
       setupHotkeys();
     };
+
+    // FETCH PROPERTIES FROM SUPABASE
+    async function fetchPropertiesFromCloud() {
+      const { data, error } = await supabase.from('properties').select('*');
+      if (error) {
+        console.error('Error fetching properties:', error);
+      } else if (data && data.length > 0) {
+        properties = data.map(p => ({
+          id: p.id,
+          ref: p.ref,
+          status: p.status,
+          district: p.district,
+          type: p.type,
+          titleZh: p.title_zh,
+          titleEn: p.title_en,
+          block: p.block,
+          floor: p.floor,
+          unit: p.unit,
+          price: p.price,
+          grossArea: p.gross_area,
+          saleableArea: p.saleable_area,
+          view: p.view,
+          layout: p.layout,
+          mgmt: p.mgmt,
+          contactName: p.contact_name,
+          contactPhone: p.contact_phone,
+          notes: p.notes,
+          photos: p.photos || []
+        }));
+      } else {
+        // Auto-seed default properties into Supabase if table is empty
+        for (let p of defaultProperties) {
+          await supabase.from('properties').upsert({
+            id: p.id,
+            ref: p.ref,
+            status: p.status,
+            district: p.district,
+            type: p.type,
+            title_zh: p.titleZh,
+            title_en: p.titleEn,
+            block: p.block,
+            floor: p.floor,
+            unit: p.unit,
+            price: p.price,
+            gross_area: p.grossArea,
+            saleable_area: p.saleableArea,
+            view: p.view,
+            layout: p.layout,
+            mgmt: p.mgmt,
+            contact_name: p.contactName,
+            contact_phone: p.contactPhone,
+            notes: p.notes,
+            photos: p.photos
+          });
+        }
+        properties = defaultProperties;
+      }
+      updateDashboardStats();
+      renderListings();
+      populateEAADropdown();
+    }
+
+    // REALTIME SYNC ACROSS DEVICES
+    function setupRealtimeSync() {
+      supabase
+        .channel('public:properties')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'properties' }, payload => {
+          fetchPropertiesFromCloud();
+        })
+        .subscribe();
+    }
 
     // TAB SWITCHING SYSTEM
     function switchTab(tabName) {
@@ -884,13 +963,12 @@
       });
 
       filtered.forEach(p => {
-        // Price formatting
         let priceDisplay = p.status === 'Rent' 
           ? `$${Math.round(p.price * 1000000).toLocaleString()}/月`
           : `$${p.price} M`;
 
         let saleablePriceSqft = p.saleableArea > 0 
-          ? Math.round((p.price * (p.status === 'Rent' ? 1000000 : 1000000)) / p.saleableArea)
+          ? Math.round((p.price * 1000000) / p.saleableArea)
           : 0;
 
         let photoBadgeCount = p.photos ? p.photos.length : 0;
@@ -955,9 +1033,7 @@
       const price = parseFloat(document.getElementById('edit-price').value) || 0;
       const gross = parseFloat(document.getElementById('edit-grossArea').value) || 0;
       const saleable = parseFloat(document.getElementById('edit-saleableArea').value) || 0;
-      const status = document.getElementById('edit-status').value;
 
-      // Efficiency
       if (gross > 0 && saleable > 0) {
         const eff = Math.round((saleable / gross) * 100);
         document.getElementById('edit-efficiency').value = eff + ' %';
@@ -965,10 +1041,8 @@
         document.getElementById('edit-efficiency').value = '-- %';
       }
 
-      // Saleable Price / Sqft
       if (price > 0 && saleable > 0) {
-        const multiplier = status === 'Rent' ? 1000000 : 1000000;
-        const psqft = Math.round((price * multiplier) / saleable);
+        const psqft = Math.round((price * 1000000) / saleable);
         document.getElementById('edit-saleablePrice').value = '$' + psqft.toLocaleString();
       } else {
         document.getElementById('edit-saleablePrice').value = '$--';
@@ -1018,59 +1092,58 @@
       switchTab('edit');
     }
 
-    // SAVE PROPERTY RECORD
-    function saveProperty(e) {
+    // SAVE PROPERTY RECORD TO SUPABASE
+    async function saveProperty(e) {
       e.preventDefault();
       const id = document.getElementById('edit-id').value || "SK-" + Date.now();
       
-      // Get current photo URLs from grid
       const photoElements = document.querySelectorAll('.grid-photo-url');
       const photosList = Array.from(photoElements).map(el => el.value);
 
-      const propertyData = {
+      const propertyPayload = {
         id: id,
         ref: document.getElementById('edit-ref').value,
         status: document.getElementById('edit-status').value,
         district: document.getElementById('edit-district').value,
         type: document.getElementById('edit-type').value,
-        titleZh: document.getElementById('edit-titleZh').value,
-        titleEn: document.getElementById('edit-titleEn').value,
+        title_zh: document.getElementById('edit-titleZh').value,
+        title_en: document.getElementById('edit-titleEn').value,
         block: document.getElementById('edit-block').value,
         floor: document.getElementById('edit-floor').value,
         unit: document.getElementById('edit-unit').value,
         price: parseFloat(document.getElementById('edit-price').value),
-        grossArea: parseInt(document.getElementById('edit-grossArea').value) || 0,
-        saleableArea: parseInt(document.getElementById('edit-saleableArea').value),
+        gross_area: parseInt(document.getElementById('edit-grossArea').value) || 0,
+        saleable_area: parseInt(document.getElementById('edit-saleableArea').value),
         view: document.getElementById('edit-view').value,
         layout: document.getElementById('edit-layout').value,
         mgmt: document.getElementById('edit-mgmt').value,
-        contactName: document.getElementById('edit-contactName').value,
-        contactPhone: document.getElementById('edit-contactPhone').value,
+        contact_name: document.getElementById('edit-contactName').value,
+        contact_phone: document.getElementById('edit-contactPhone').value,
         notes: document.getElementById('edit-notes').value,
         photos: photosList.length > 0 ? photosList : ["https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&auto=format&fit=crop&q=60"]
       };
 
-      const existingIndex = properties.findIndex(p => p.id === id);
-      if (existingIndex >= 0) {
-        properties[existingIndex] = propertyData;
-      } else {
-        properties.unshift(propertyData);
+      const { error } = await supabase.from('properties').upsert(propertyPayload);
+
+      if (error) {
+        alert("儲存失敗 (Save failed): " + error.message);
+        return;
       }
 
-      updateDashboardStats();
-      renderListings();
-      populateEAADropdown();
-      alert("樓盤資料及相片已成功儲存！(Saved successfully)");
+      alert("樓盤資料已成功儲存並同步至雲端！(Saved successfully)");
+      await fetchPropertiesFromCloud();
       switchTab('index');
     }
 
-    // DELETE PROPERTY RECORD
-    function deleteProperty(id) {
+    // DELETE PROPERTY RECORD FROM SUPABASE
+    async function deleteProperty(id) {
       if (confirm("確定要刪除此樓盤資料嗎？ (Confirm delete?)")) {
-        properties = properties.filter(p => p.id !== id);
-        updateDashboardStats();
-        renderListings();
-        populateEAADropdown();
+        const { error } = await supabase.from('properties').delete().eq('id', id);
+        if (error) {
+          alert("刪除失敗 (Delete failed): " + error.message);
+          return;
+        }
+        await fetchPropertiesFromCloud();
       }
     }
 
@@ -1117,7 +1190,6 @@
       const currentList = Array.from(photoElements).map(el => el.value);
 
       for (let file of files) {
-        // Create local Object URL for preview
         const localUrl = URL.createObjectURL(file);
         currentList.push(localUrl);
       }
@@ -1126,7 +1198,6 @@
 
     function removePhotoFromGrid(btnElement) {
       btnElement.closest('.relative').remove();
-      // Re-render to ensure cover badge updates
       const photoElements = document.querySelectorAll('.grid-photo-url');
       const currentList = Array.from(photoElements).map(el => el.value);
       renderPhotoGrid(currentList);
@@ -1141,7 +1212,7 @@
       document.getElementById('image-modal').classList.add('hidden');
     }
 
-    // EAA FORM GENERATOR (STATUTORY FORMS 3 & 5)
+    // EAA FORM GENERATOR
     function populateEAADropdown() {
       const select = document.getElementById('eaa-property-select');
       select.innerHTML = '';
@@ -1175,12 +1246,14 @@
       const p = properties.find(item => item.id === selectedId) || properties[0];
       const formContainer = document.getElementById('printable-form');
 
-      if (!p) return;
+      if (!p) {
+        formContainer.innerHTML = `<p class="text-center text-slate-500 py-6">請先新增或選擇一個樓盤</p>`;
+        return;
+      }
 
       const dateStr = new Date().toLocaleDateString('zh-HK');
 
       if (currentEAAFormType === 'form3') {
-        // ESTATE AGENTS AUTHORITY FORM 3 (放盤協議)
         formContainer.innerHTML = `
           <div class="text-center border-b pb-4 space-y-1">
             <h1 class="text-lg font-bold">地產代理監管局表格 3 (Estate Agents Authority Form 3)</h1>
@@ -1221,7 +1294,6 @@
           </div>
         `;
       } else {
-        // ESTATE AGENTS AUTHORITY FORM 5 (物業資料表格)
         formContainer.innerHTML = `
           <div class="text-center border-b pb-4 space-y-1">
             <h1 class="text-lg font-bold">地產代理監管局表格 5 (Estate Agents Authority Form 5)</h1>
@@ -1265,7 +1337,6 @@
       const loanAmount = price * ltvPercent;
       const downPayment = price - loanAmount;
 
-      // Monthly Payment Formula: P * r * (1+r)^n / ((1+r)^n - 1)
       const monthlyRate = ratePercent / 12;
       const totalMonths = years * 12;
       
@@ -1278,7 +1349,6 @@
       document.getElementById('res-loanamount').innerText = '$' + Math.round(loanAmount).toLocaleString();
       document.getElementById('res-monthly').innerText = '$' + Math.round(monthlyRepayment).toLocaleString();
 
-      // Stamp Duty Calculation (Scale 2 AVD)
       let stampDuty = 0;
       if (price <= 3000000) stampDuty = 100;
       else if (price <= 3528240) stampDuty = 100 + (price - 3000000) * 0.1;
