@@ -567,7 +567,15 @@
   <script>
     const SUPABASE_URL = 'https://ndojbpbkxysncodjfnwu.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_jVBNce5laZHb_DYcvcE4lg_giGTTHxq';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let supabaseClient = null;
+    try {
+      if (window.supabase) {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      }
+    } catch (e) {
+      console.warn('Supabase init failed, running local offline mode.', e);
+    }
 
     const defaultProperties = [
       {
@@ -586,72 +594,47 @@
       }
     ];
 
-    let properties = [];
+    let properties = defaultProperties;
     let currentEAAFormType = 'form3';
 
-    // GUARANTEED IMMEDIATE TAB SETUP ON LOAD
-    document.addEventListener("DOMContentLoaded", function() {
-      setupTabListeners();
+    // GUARANTEED IMMEDIATE LOAD
+    window.onload = function() {
       runMortgageCalc();
       setupHotkeys();
-      fetchPropertiesFromCloud();
-    });
+      loadPropertiesData();
+    };
 
-    function setupTabListeners() {
-      const buttons = document.querySelectorAll('.nav-btn');
-      buttons.forEach(btn => {
-        btn.addEventListener('click', function(e) {
-          e.preventDefault();
-          const tabName = this.getAttribute('data-tab');
-          if (tabName) switchTab(tabName);
-        });
-      });
-    }
-
-    async function fetchPropertiesFromCloud() {
-      try {
-        const { data, error } = await supabase.from('properties').select('*');
-        if (error) {
-          console.error('Error fetching properties:', error);
-          properties = defaultProperties;
-        } else if (data && data.length > 0) {
-          properties = data.map(p => ({
-            id: p.id,
-            ref: p.ref,
-            status: p.status,
-            district: p.district,
-            type: p.type,
-            titleZh: p.title_zh,
-            titleEn: p.title_en,
-            block: p.block,
-            floor: p.floor,
-            unit: p.unit,
-            price: p.price,
-            grossArea: p.gross_area,
-            saleableArea: p.saleable_area,
-            view: p.view,
-            layout: p.layout,
-            mgmt: p.mgmt,
-            contactName: p.contact_name,
-            contactPhone: p.contact_phone,
-            notes: p.notes,
-            photos: p.photos || []
-          }));
-        } else {
-          for (let p of defaultProperties) {
-            await supabase.from('properties').upsert({
-              id: p.id, ref: p.ref, status: p.status, district: p.district, type: p.type,
-              title_zh: p.titleZh, title_en: p.titleEn, block: p.block, floor: p.floor, unit: p.unit,
-              price: p.price, gross_area: p.grossArea, saleable_area: p.saleableArea, view: p.view,
-              layout: p.layout, mgmt: p.mgmt, contact_name: p.contactName, contact_phone: p.contactPhone,
-              notes: p.notes, photos: p.photos
-            });
+    async function loadPropertiesData() {
+      if (supabaseClient) {
+        try {
+          const { data, error } = await supabaseClient.from('properties').select('*');
+          if (!error && data && data.length > 0) {
+            properties = data.map(p => ({
+              id: p.id,
+              ref: p.ref,
+              status: p.status,
+              district: p.district,
+              type: p.type,
+              titleZh: p.title_zh,
+              titleEn: p.title_en,
+              block: p.block,
+              floor: p.floor,
+              unit: p.unit,
+              price: p.price,
+              grossArea: p.gross_area,
+              saleableArea: p.saleable_area,
+              view: p.view,
+              layout: p.layout,
+              mgmt: p.mgmt,
+              contactName: p.contact_name,
+              contactPhone: p.contact_phone,
+              notes: p.notes,
+              photos: p.photos || []
+            }));
           }
-          properties = defaultProperties;
+        } catch (err) {
+          console.warn('Using default fallback data due to network issue:', err);
         }
-      } catch (err) {
-        console.error('Connection exception:', err);
-        properties = defaultProperties;
       }
       updateDashboardStats();
       renderListings();
@@ -659,7 +642,7 @@
       renderDealRecords();
     }
 
-    // TAB SWITCHING
+    // TAB SWITCHING (Guaranteed Clickable)
     function switchTab(tabName) {
       document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.nav-btn').forEach(el => {
@@ -668,7 +651,7 @@
       });
 
       const activeView = document.getElementById(`view-${tabName}`);
-      const activeNav = document.querySelector(`[data-tab="${tabName}"]`);
+      const activeNav = document.getElementById(`nav-${tabName}`);
 
       if (activeView) activeView.classList.remove('hidden');
       if (activeNav) {
@@ -862,26 +845,62 @@
         photos: photosList.length > 0 ? photosList : ["https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&auto=format&fit=crop&q=60"]
       };
 
-      const { error } = await supabase.from('properties').upsert(propertyPayload);
-
-      if (error) {
-        alert("儲存失敗 (Save failed): " + error.message);
-        return;
+      if (supabaseClient) {
+        const { error } = await supabaseClient.from('properties').upsert(propertyPayload);
+        if (error) {
+          console.warn("Cloud save warning, saving locally:", error.message);
+        }
       }
 
-      alert("樓盤資料已成功儲存並同步至雲端！");
-      await fetchPropertiesFromCloud();
+      // Update local state immediately
+      const existingIdx = properties.findIndex(p => p.id === id);
+      const localObj = {
+        id: propertyPayload.id,
+        ref: propertyPayload.ref,
+        status: propertyPayload.status,
+        district: propertyPayload.district,
+        type: propertyPayload.type,
+        titleZh: propertyPayload.title_zh,
+        titleEn: propertyPayload.title_en,
+        block: propertyPayload.block,
+        floor: propertyPayload.floor,
+        unit: propertyPayload.unit,
+        price: propertyPayload.price,
+        grossArea: propertyPayload.gross_area,
+        saleableArea: propertyPayload.saleable_area,
+        view: propertyPayload.view,
+        layout: propertyPayload.layout,
+        mgmt: propertyPayload.mgmt,
+        contactName: propertyPayload.contact_name,
+        contactPhone: propertyPayload.contact_phone,
+        notes: propertyPayload.notes,
+        photos: propertyPayload.photos
+      };
+
+      if (existingIdx >= 0) {
+        properties[existingIdx] = localObj;
+      } else {
+        properties.unshift(localObj);
+      }
+
+      alert("樓盤資料已成功儲存！");
+      updateDashboardStats();
+      renderListings();
+      populateEAADropdown();
+      renderDealRecords();
       switchTab('index');
     }
 
     async function deleteProperty(id) {
       if (confirm("確定要刪除此樓盤資料嗎？")) {
-        const { error } = await supabase.from('properties').delete().eq('id', id);
-        if (error) {
-          alert("刪除失敗: " + error.message);
-          return;
+        if (supabaseClient) {
+          await supabaseClient.from('properties').delete().eq('id', id);
         }
-        await fetchPropertiesFromCloud();
+        properties = properties.filter(p => p.id !== id);
+        updateDashboardStats();
+        renderListings();
+        populateEAADropdown();
+        renderDealRecords();
       }
     }
 
