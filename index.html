@@ -1321,6 +1321,10 @@
       const container = document.getElementById('nav-container');
       container.classList.toggle('hidden');
     }
-  </script>
+  <script>
+    // Initialize Supabase Client
+    const SUPABASE_URL = https://ndojbpbkxysncodjfnwu.supabase.co; //
+    const SUPABASE_ANON_KEY = 'sb_publishable_jVBNce5laZHb_DYcvcE4lg_giGTTHxq';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 </body>
 </html>
