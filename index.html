@@ -1322,6 +1322,557 @@
       const container = document.getElementById('nav-container');
       container.classList.toggle('hidden');
     }
+    // Initialize Supabase Client
+    const SUPABASE_URL = 'https://ndojbpbkxysncodjfnwu.supabase.co/rest/v1/'; //
+    const SUPABASE_ANON_KEY = 'sb_publishable_jVBNce5laZHb_DYcvcE4lg_giGTTHxq';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let properties = [];
+    let currentEAAFormType = 'form3';
+
+    // INITIALIZATION ON PAGE LOAD (FETCH FROM CLOUD + REALTIME)
+    window.onload = async function() {
+      await fetchPropertiesFromCloud();
+      setupRealtimeSync();
+      runMortgageCalc();
+      setupHotkeys();
+    };
+
+    // FETCH PROPERTIES FROM SUPABASE
+    async function fetchPropertiesFromCloud() {
+      const { data, error } = await supabase.from('properties').select('*');
+      if (error) {
+        console.error('Error fetching properties:', error);
+      } else if (data) {
+        properties = data.map(p => ({
+          id: p.id,
+          ref: p.ref,
+          status: p.status,
+          district: p.district,
+          type: p.type,
+          titleZh: p.title_zh,
+          titleEn: p.title_en,
+          block: p.block,
+          floor: p.floor,
+          unit: p.unit,
+          price: p.price,
+          grossArea: p.gross_area,
+          saleableArea: p.saleable_area,
+          view: p.view,
+          layout: p.layout,
+          mgmt: p.mgmt,
+          contactName: p.contact_name,
+          contactPhone: p.contact_phone,
+          notes: p.notes,
+          photos: p.photos || []
+        }));
+      }
+      updateDashboardStats();
+      renderListings();
+      populateEAADropdown();
+    }
+
+    // REALTIME SYNC ACROSS DEVICES
+    function setupRealtimeSync() {
+      supabase
+        .channel('public:properties')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'properties' }, payload => {
+          fetchPropertiesFromCloud();
+        })
+        .subscribe();
+    }
+
+    // TAB SWITCHING SYSTEM
+    function switchTab(tabName) {
+      document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.nav-btn').forEach(el => {
+        el.classList.remove('bg-brand-600', 'text-white');
+        el.classList.add('text-slate-300');
+      });
+
+      const activeView = document.getElementById(`view-${tabName}`);
+      const activeNav = document.getElementById(`nav-${tabName}`);
+
+      if (activeView) activeView.classList.remove('hidden');
+      if (activeNav) {
+        activeNav.classList.add('bg-brand-600', 'text-white');
+        activeNav.classList.remove('text-slate-300');
+      }
+
+      if (tabName === 'eaa') {
+        renderEAAForm();
+      }
+    }
+
+    // DASHBOARD STATS CALCULATOR
+    function updateDashboardStats() {
+      const total = properties.length;
+      const sales = properties.filter(p => p.status === 'Sale').length;
+      const rents = properties.filter(p => p.status === 'Rent').length;
+
+      let saleablePrices = properties
+        .filter(p => p.status === 'Sale' && p.saleableArea > 0)
+        .map(p => (p.price * 1000000) / p.saleableArea);
+      
+      let avgPrice = saleablePrices.length > 0 
+        ? Math.round(saleablePrices.reduce((a, b) => a + b, 0) / saleablePrices.length) 
+        : 0;
+
+      document.getElementById('stat-total').innerText = total;
+      document.getElementById('stat-sale').innerText = sales;
+      document.getElementById('stat-rent').innerText = rents;
+      document.getElementById('stat-avgprice').innerText = '$' + avgPrice.toLocaleString();
+    }
+
+    // RENDER PROPERTY LISTINGS TABLE
+    function renderListings() {
+      const districtFilter = document.getElementById('filter-district').value;
+      const typeFilter = document.getElementById('filter-type').value;
+      const statusFilter = document.getElementById('filter-status').value;
+      const searchFilter = document.getElementById('filter-search').value.toLowerCase().trim();
+
+      const tbody = document.getElementById('listing-table-body');
+      tbody.innerHTML = '';
+
+      let filtered = properties.filter(p => {
+        if (districtFilter !== 'ALL' && p.district !== districtFilter) return false;
+        if (typeFilter !== 'ALL' && p.type !== typeFilter) return false;
+        if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+        if (searchFilter) {
+          const matchString = `${p.ref} ${p.titleZh} ${p.titleEn} ${p.district} ${p.contactName}`.toLowerCase();
+          if (!matchString.includes(searchFilter)) return false;
+        }
+        return true;
+      });
+
+      filtered.forEach(p => {
+        let priceDisplay = p.status === 'Rent' 
+          ? `$${Math.round(p.price * 1000000).toLocaleString()}/月`
+          : `$${p.price} M`;
+
+        let saleablePriceSqft = p.saleableArea > 0 
+          ? Math.round((p.price * 1000000) / p.saleableArea)
+          : 0;
+
+        let photoBadgeCount = p.photos ? p.photos.length : 0;
+        let coverPhoto = (p.photos && p.photos.length > 0) ? p.photos[0] : 'https://placehold.co/100x75/e2e8f0/64748b?text=No+Photo';
+
+        let tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-200';
+        tr.innerHTML = `
+          <td class="p-3 font-bold text-slate-800">${p.ref}</td>
+          <td class="p-3">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold ${p.status === 'Sale' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+              ${p.status === 'Sale' ? '出售 Sale' : '出租 Rent'}
+            </span>
+          </td>
+          <td class="p-3">
+            <div class="font-bold text-slate-800">${p.titleZh}</div>
+            <div class="text-[11px] text-slate-500">${p.titleEn}</div>
+          </td>
+          <td class="p-3 text-slate-600">
+            ${p.block || ''} ${p.floor || ''} ${p.unit || ''}
+          </td>
+          <td class="p-3">
+            <div><span class="text-slate-500">實:</span> <strong class="text-slate-800">${p.saleableArea}</strong> 呎</div>
+            <div class="text-[11px] text-slate-400">建: ${p.grossArea || '--'} 呎</div>
+          </td>
+          <td class="p-3 font-bold text-brand-700 text-sm">${priceDisplay}</td>
+          <td class="p-3 font-semibold text-indigo-700">$${saleablePriceSqft.toLocaleString()}</td>
+          <td class="p-3 text-center">
+            <button onclick="openImageModal('${coverPhoto}')" class="relative group inline-block focus:outline-none">
+              <img src="${coverPhoto}" class="w-12 h-9 object-cover rounded border border-slate-300 shadow-sm group-hover:opacity-80"/>
+              <span class="absolute -top-1.5 -right-1.5 bg-slate-800 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold shadow">
+                ${photoBadgeCount}
+              </span>
+            </button>
+          </td>
+          <td class="p-3">
+            <div class="text-slate-800 font-medium">${p.contactName || '--'}</div>
+            <div class="text-[11px] text-slate-500"><i class="fa-solid fa-phone text-[9px]"></i> ${p.contactPhone || '--'}</div>
+          </td>
+          <td class="p-3 text-center">
+            <div class="flex items-center justify-center gap-1">
+              <button onclick="editProperty('${p.id}')" title="編輯詳情" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button onclick="selectForEAA('${p.id}')" title="產生地產表格" class="p-1.5 text-brand-600 hover:bg-brand-50 rounded">
+                <i class="fa-solid fa-file-contract"></i>
+              </button>
+              <button onclick="deleteProperty('${p.id}')" title="刪除樓盤" class="p-1.5 text-red-500 hover:bg-red-50 rounded">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('showing-count').innerText = `顯示 ${filtered.length} 個樓盤中的 ${properties.length} 個`;
+    }
+
+    // AUTO-CALCULATION OF EFFICIENCY & PRICE PER SQFT
+    function calculateRates() {
+      const price = parseFloat(document.getElementById('edit-price').value) || 0;
+      const gross = parseFloat(document.getElementById('edit-grossArea').value) || 0;
+      const saleable = parseFloat(document.getElementById('edit-saleableArea').value) || 0;
+      const status = document.getElementById('edit-status').value;
+
+      if (gross > 0 && saleable > 0) {
+        const eff = Math.round((saleable / gross) * 100);
+        document.getElementById('edit-efficiency').value = eff + ' %';
+      } else {
+        document.getElementById('edit-efficiency').value = '-- %';
+      }
+
+      if (price > 0 && saleable > 0) {
+        const psqft = Math.round((price * 1000000) / saleable);
+        document.getElementById('edit-saleablePrice').value = '$' + psqft.toLocaleString();
+      } else {
+        document.getElementById('edit-saleablePrice').value = '$--';
+      }
+    }
+
+    // EDIT PROPERTY FORM POPULATION
+    function editProperty(id) {
+      const p = properties.find(item => item.id === id);
+      if (!p) return;
+
+      document.getElementById('edit-id').value = p.id;
+      document.getElementById('edit-ref').value = p.ref;
+      document.getElementById('edit-status').value = p.status;
+      document.getElementById('edit-district').value = p.district;
+      document.getElementById('edit-type').value = p.type;
+      document.getElementById('edit-titleZh').value = p.titleZh;
+      document.getElementById('edit-titleEn').value = p.titleEn;
+      document.getElementById('edit-block').value = p.block || '';
+      document.getElementById('edit-floor').value = p.floor || '';
+      document.getElementById('edit-unit').value = p.unit || '';
+      document.getElementById('edit-price').value = p.price;
+      document.getElementById('edit-grossArea').value = p.grossArea || '';
+      document.getElementById('edit-saleableArea').value = p.saleableArea;
+      document.getElementById('edit-view').value = p.view || '';
+      document.getElementById('edit-layout').value = p.layout || '';
+      document.getElementById('edit-mgmt').value = p.mgmt || '';
+      document.getElementById('edit-contactName').value = p.contactName || '';
+      document.getElementById('edit-contactPhone').value = p.contactPhone || '';
+      document.getElementById('edit-notes').value = p.notes || '';
+
+      document.getElementById('form-title-text').innerText = `編輯樓盤 : ${p.ref} (${p.titleZh})`;
+      
+      calculateRates();
+      renderPhotoGrid(p.photos || []);
+      switchTab('edit');
+    }
+
+    // CREATE BLANK PROPERTY
+    function createNewProperty() {
+      const newRef = "SK-" + String(properties.length + 1).padStart(3, '0');
+      document.getElementById('property-form').reset();
+      document.getElementById('edit-id').value = '';
+      document.getElementById('edit-ref').value = newRef;
+      document.getElementById('form-title-text').innerText = "新增樓盤資料 (New Property)";
+      renderPhotoGrid([]);
+      switchTab('edit');
+    }
+
+    // SAVE PROPERTY RECORD TO SUPABASE
+    async function saveProperty(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-id').value || "SK-" + Date.now();
+      
+      const photoElements = document.querySelectorAll('.grid-photo-url');
+      const photosList = Array.from(photoElements).map(el => el.value);
+
+      const propertyPayload = {
+        id: id,
+        ref: document.getElementById('edit-ref').value,
+        status: document.getElementById('edit-status').value,
+        district: document.getElementById('edit-district').value,
+        type: document.getElementById('edit-type').value,
+        title_zh: document.getElementById('edit-titleZh').value,
+        title_en: document.getElementById('edit-titleEn').value,
+        block: document.getElementById('edit-block').value,
+        floor: document.getElementById('edit-floor').value,
+        unit: document.getElementById('edit-unit').value,
+        price: parseFloat(document.getElementById('edit-price').value),
+        gross_area: parseInt(document.getElementById('edit-grossArea').value) || 0,
+        saleable_area: parseInt(document.getElementById('edit-saleableArea').value),
+        view: document.getElementById('edit-view').value,
+        layout: document.getElementById('edit-layout').value,
+        mgmt: document.getElementById('edit-mgmt').value,
+        contact_name: document.getElementById('edit-contactName').value,
+        contact_phone: document.getElementById('edit-contactPhone').value,
+        notes: document.getElementById('edit-notes').value,
+        photos: photosList
+      };
+
+      const { error } = await supabase.from('properties').upsert(propertyPayload);
+
+      if (error) {
+        alert("儲存失敗 (Save failed): " + error.message);
+        return;
+      }
+
+      alert("樓盤資料已成功儲存並同步至雲端！(Saved & synced successfully)");
+      await fetchPropertiesFromCloud();
+      switchTab('index');
+    }
+
+    // DELETE PROPERTY RECORD FROM SUPABASE
+    async function deleteProperty(id) {
+      if (confirm("確定要刪除此樓盤資料嗎？ (Confirm delete?)")) {
+        const { error } = await supabase.from('properties').delete().eq('id', id);
+        if (error) {
+          alert("刪除失敗 (Delete failed): " + error.message);
+          return;
+        }
+        await fetchPropertiesFromCloud();
+      }
+    }
+
+    // PHOTO MANAGER GRID FUNCTIONS
+    function renderPhotoGrid(photoUrls) {
+      const container = document.getElementById('photo-grid');
+      container.innerHTML = '';
+
+      photoUrls.forEach((url, idx) => {
+        const div = document.createElement('div');
+        div.className = 'relative group border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm';
+        div.innerHTML = `
+          <input type="hidden" class="grid-photo-url" value="${url}"/>
+          <img src="${url}" class="w-full h-24 object-cover"/>
+          ${idx === 0 ? '<span class="absolute top-1 left-1 bg-brand-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">封面 Cover</span>' : ''}
+          <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-2">
+            <button type="button" onclick="openImageModal('${url}')" class="text-white bg-slate-800/80 p-1.5 rounded hover:bg-slate-900 text-xs">
+              <i class="fa-solid fa-expand"></i>
+            </button>
+            <button type="button" onclick="removePhotoFromGrid(this)" class="text-white bg-red-600/80 p-1.5 rounded hover:bg-red-700 text-xs">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function addPhotoUrlPrompt() {
+      const url = prompt("請輸入相片網址 (Enter Image URL):", "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=60");
+      if (url && url.trim() !== "") {
+        const photoElements = document.querySelectorAll('.grid-photo-url');
+        const currentList = Array.from(photoElements).map(el => el.value);
+        currentList.push(url.trim());
+        renderPhotoGrid(currentList);
+      }
+    }
+
+    function handleSimulatedUpload(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+
+      const photoElements = document.querySelectorAll('.grid-photo-url');
+      const currentList = Array.from(photoElements).map(el => el.value);
+
+      for (let file of files) {
+        const localUrl = URL.createObjectURL(file);
+        currentList.push(localUrl);
+      }
+      renderPhotoGrid(currentList);
+    }
+
+    function removePhotoFromGrid(btnElement) {
+      btnElement.closest('.relative').remove();
+      const photoElements = document.querySelectorAll('.grid-photo-url');
+      const currentList = Array.from(photoElements).map(el => el.value);
+      renderPhotoGrid(currentList);
+    }
+
+    // IMAGE MODAL
+    function openImageModal(url) {
+      document.getElementById('modal-img-element').src = url;
+      document.getElementById('image-modal').classList.remove('hidden');
+    }
+    function closeImageModal() {
+      document.getElementById('image-modal').classList.add('hidden');
+    }
+
+    // EAA FORM GENERATOR
+    function populateEAADropdown() {
+      const select = document.getElementById('eaa-property-select');
+      select.innerHTML = '';
+      properties.forEach(p => {
+        let opt = document.createElement('option');
+        opt.value = p.id;
+        opt.innerText = `${p.ref} - ${p.titleZh}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function selectForEAA(id) {
+      document.getElementById('eaa-property-select').value = id;
+      switchTab('eaa');
+    }
+
+    function setEAAFormType(type) {
+      currentEAAFormType = type;
+      if (type === 'form3') {
+        document.getElementById('btn-form3').className = "flex-1 md:flex-initial px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg shadow-sm";
+        document.getElementById('btn-form5').className = "flex-1 md:flex-initial px-4 py-2 bg-slate-200 text-slate-800 text-xs font-bold rounded-lg hover:bg-slate-300";
+      } else {
+        document.getElementById('btn-form5').className = "flex-1 md:flex-initial px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-lg shadow-sm";
+        document.getElementById('btn-form3').className = "flex-1 md:flex-initial px-4 py-2 bg-slate-200 text-slate-800 text-xs font-bold rounded-lg hover:bg-slate-300";
+      }
+      renderEAAForm();
+    }
+
+    function renderEAAForm() {
+      const selectedId = document.getElementById('eaa-property-select').value;
+      const p = properties.find(item => item.id === selectedId) || properties[0];
+      const formContainer = document.getElementById('printable-form');
+
+      if (!p) {
+        formContainer.innerHTML = `<p class="text-center text-slate-500 py-6">請先新增或選擇一個樓盤 (Please select a property)</p>`;
+        return;
+      }
+
+      const dateStr = new Date().toLocaleDateString('zh-HK');
+
+      if (currentEAAFormType === 'form3') {
+        formContainer.innerHTML = `
+          <div class="text-center border-b pb-4 space-y-1">
+            <h1 class="text-lg font-bold">地產代理監管局表格 3 (Estate Agents Authority Form 3)</h1>
+            <h2 class="text-base font-bold text-slate-800">地產代理協議 (出售住宅物業適用)</h2>
+            <p class="text-[11px] text-slate-500">Estate Agency Agreement for Sale of Residential Properties in Hong Kong</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 border p-3 rounded bg-slate-50">
+            <div><strong>地產代理公司 (Agency):</strong> 和興地產 Wo Hing Property Agency</div>
+            <div><strong>牌照號碼 (License No.):</strong> C-088998</div>
+            <div><strong>放盤代理電話 (Tel):</strong> (852) 2792 8888</div>
+            <div><strong>協議日期 (Date):</strong> ${dateStr}</div>
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="font-bold border-b pb-1">第一部：物業資料 (Part 1: Property Details)</h3>
+            <p><strong>物業地址 (Address):</strong> 香港新界西貢/清水灣 ${p.district} ${p.titleZh} (${p.titleEn}) ${p.block || ''} ${p.floor || ''} ${p.unit || ''}</p>
+            <p><strong>放盤種類 (Listing Status):</strong> ${p.status === 'Sale' ? '出售 (For Sale)' : '出租 (For Rent)'}</p>
+            <p><strong>業主指定叫價 (Asking Price):</strong> <span class="text-brand-700 font-bold">${p.status === 'Rent' ? '$' + Math.round(p.price*1000000) + ' /月' : '$' + p.price + ' 百萬 (HKD)'}</span></p>
+          </div>
+
+          <div class="space-y-2">
+            <h3 class="font-bold border-b pb-1">第二部：代理佣金及條款 (Part 2: Commission & Terms)</h3>
+            <p>1. 賣方同意委託「和興地產」為其代理人，推廣及處理上述物業之買賣事宜。</p>
+            <p>2. 佣金約定：成交價之 1% (或雙方協議之金額)。</p>
+            <p>3. 本協議有效期為即日起算 90 天。</p>
+          </div>
+
+          <div class="pt-8 grid grid-cols-2 gap-8 text-center">
+            <div class="border-t border-slate-400 pt-2">
+              <p class="font-bold">業主 / 授權代表簽署</p>
+              <p class="text-slate-500">${p.contactName || '（業主姓名）'}</p>
+            </div>
+            <div class="border-t border-slate-400 pt-2">
+              <p class="font-bold">和興地產 授權代表簽署</p>
+              <p class="text-slate-500">Wo Hing Property Agency</p>
+            </div>
+          </div>
+        `;
+      } else {
+        formContainer.innerHTML = `
+          <div class="text-center border-b pb-4 space-y-1">
+            <h1 class="text-lg font-bold">地產代理監管局表格 5 (Estate Agents Authority Form 5)</h1>
+            <h2 class="text-base font-bold text-slate-800">物業資料表格 (住宅物業適用)</h2>
+            <p class="text-[11px] text-slate-500">Property Information Form for Residential Properties</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 border p-3 rounded bg-slate-50">
+            <div><strong>物業編號 (Ref No.):</strong> ${p.ref}</div>
+            <div><strong>填報日期 (Date):</strong> ${dateStr}</div>
+            <div><strong>負責代理:</strong> 和興地產 (牌照 C-088998)</div>
+            <div><strong>地區 (District):</strong> ${p.district}</div>
+          </div>
+
+          <div class="space-y-3">
+            <h3 class="font-bold border-b pb-1">物業詳細特徵 (Property Details)</h3>
+            <table class="w-full border-collapse border text-left">
+              <tr class="border"><th class="p-2 bg-slate-100 border">物業名稱</th><td class="p-2 border">${p.titleZh} (${p.titleEn})</td></tr>
+              <tr class="border"><th class="p-2 bg-slate-100 border">實用面積 Saleable Area</th><td class="p-2 border">${p.saleableArea} 平方呎 (Sq.ft)</td></tr>
+              <tr class="border"><th class="p-2 bg-slate-100 border">建築面積 Gross Area</th><td class="p-2 border">${p.grossArea || '--'} 平方呎 (Sq.ft)</td></tr>
+              <tr class="border"><th class="p-2 bg-slate-100 border">間隔及特色 Layout</th><td class="p-2 border">${p.layout || '--'}</td></tr>
+              <tr class="border"><th class="p-2 bg-slate-100 border">景觀及朝向 View</th><td class="p-2 border">${p.view || '--'}</td></tr>
+              <tr class="border"><th class="p-2 bg-slate-100 border">管理費用 Management Fee</th><td class="p-2 border">${p.mgmt || '--'}</td></tr>
+            </table>
+          </div>
+
+          <div class="pt-6 border-t text-slate-500 text-[10px]">
+            <p>* 本表格資料乃根據業主提供及土地註冊處資料整理，僅供買賣參考。</p>
+          </div>
+        `;
+      }
+    }
+
+    // MORTGAGE & STAMP DUTY CALCULATOR ENGINE
+    function runMortgageCalc() {
+      const price = parseFloat(document.getElementById('calc-price').value) || 0;
+      const ltvPercent = parseFloat(document.getElementById('calc-ltv').value) / 100;
+      const years = parseInt(document.getElementById('calc-years').value);
+      const ratePercent = parseFloat(document.getElementById('calc-rate').value) / 100;
+
+      const loanAmount = price * ltvPercent;
+      const downPayment = price - loanAmount;
+
+      const monthlyRate = ratePercent / 12;
+      const totalMonths = years * 12;
+      
+      let monthlyRepayment = 0;
+      if (monthlyRate > 0 && totalMonths > 0) {
+        monthlyRepayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1);
+      }
+
+      document.getElementById('res-downpayment').innerText = '$' + Math.round(downPayment).toLocaleString();
+      document.getElementById('res-loanamount').innerText = '$' + Math.round(loanAmount).toLocaleString();
+      document.getElementById('res-monthly').innerText = '$' + Math.round(monthlyRepayment).toLocaleString();
+
+      let stampDuty = 0;
+      if (price <= 3000000) stampDuty = 100;
+      else if (price <= 3528240) stampDuty = 100 + (price - 3000000) * 0.1;
+      else if (price <= 4500000) stampDuty = price * 0.015;
+      else if (price <= 5315630) stampDuty = 67500 + (price - 4500000) * 0.1;
+      else if (price <= 6000000) stampDuty = price * 0.0225;
+      else if (price <= 7528240) stampDuty = 135000 + (price - 6000000) * 0.1;
+      else if (price <= 9000000) stampDuty = price * 0.03;
+      else if (price <= 10890580) stampDuty = 270000 + (price - 9000000) * 0.1;
+      else if (price <= 20000000) stampDuty = price * 0.0375;
+      else stampDuty = price * 0.0425;
+
+      document.getElementById('res-stampduty').innerText = '$' + Math.round(stampDuty).toLocaleString();
+    }
+
+    // HOTKEYS IMPLEMENTATION (F1, F2, F5, F8)
+    function setupHotkeys() {
+      window.addEventListener('keydown', function(e) {
+        if (e.key === 'F1') {
+          e.preventDefault();
+          createNewProperty();
+        } else if (e.key === 'F2') {
+          e.preventDefault();
+          switchTab('edit');
+        } else if (e.key === 'F5') {
+          e.preventDefault();
+          switchTab('eaa');
+        } else if (e.key === 'F8') {
+          e.preventDefault();
+          switchTab('edit');
+          document.getElementById('photo-grid').scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    }
+
+    // MOBILE MENU TOGGLE
+    function toggleMobileMenu() {
+      const container = document.getElementById('nav-container');
+      container.classList.toggle('hidden');
+    }
   </script>
 </body>
 </html>
