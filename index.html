@@ -248,7 +248,7 @@
             <button type="button" onclick="createNewProperty()" class="cursor-pointer px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
               <i class="fa-solid fa-plus mr-1"></i> <span data-i18n="btn_new">新增空白樓盤</span>
             </button>
-            <button type="submit" class="cursor-pointer px-4 py-2 bg-brand-800 hover:bg-brand-900 text-white text-xs font-semibold transition">
+            <button type="submit" id="btn-submit-form" class="cursor-pointer px-4 py-2 bg-brand-800 hover:bg-brand-900 text-white text-xs font-semibold transition">
               <i class="fa-solid fa-floppy-disk mr-1"></i> <span data-i18n="btn_save">儲存資料</span>
             </button>
           </div>
@@ -325,8 +325,8 @@
           </h3>
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_price">叫價 ($M) *</label>
-              <input type="number" step="0.01" id="edit-price" required oninput="calculateRates()" class="w-full text-xs md:text-sm font-bold border border-slate-200 p-2.5 text-brand-800 bg-white outline-none" placeholder="19.8"/>
+              <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_price">叫價 ($M / 月租) *</label>
+              <input type="number" step="any" id="edit-price" required oninput="calculateRates()" class="w-full text-xs md:text-sm font-bold border border-slate-200 p-2.5 text-brand-800 bg-white outline-none" placeholder="19.8 (出售百萬) 或 28000 (出租)"/>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_gross">建築面積 (平方呎)</label>
@@ -568,7 +568,7 @@
     </div>
   </footer>
 
-  <!-- SCRIPT ENGINE WITH LOCALSTORAGE PERSISTENCE & THOUSANDS PRICING -->
+  <!-- SCRIPT ENGINE -->
   <script>
     const SUPABASE_URL = 'https://ndojbpbkxysncodjfnwu.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_jVBNce5laZHb_DYcvcE4lg_giGTTHxq';
@@ -641,7 +641,7 @@
         f_floor: "樓層",
         f_unit: "單位",
         sec_calc_engine: "面積與價格自動計算",
-        f_price: "叫價 ($M) *",
+        f_price: "叫價 ($M / 月租) *",
         f_gross: "建築面積 (平方呎)",
         f_saleable: "實用面積 (平方呎) *",
         f_eff: "實用率",
@@ -735,7 +735,7 @@
         f_floor: "Floor",
         f_unit: "Unit",
         sec_calc_engine: "Area & Pricing Calculation Engine",
-        f_price: "Asking Price ($M) *",
+        f_price: "Asking Price ($M / Rent) *",
         f_gross: "Gross Sq.ft",
         f_saleable: "Saleable Sq.ft *",
         f_eff: "Efficiency Rate",
@@ -813,9 +813,9 @@
         photos: ["https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&auto=format&fit=crop&q=60"]
       },
       {
-        id: "SK-002", ref: "SK-002", status: "Sale", district: "Silverstrand", type: "Detached House",
+        id: "SK-002", ref: "SK-002", status: "Rent", district: "Silverstrand", type: "Detached House",
         titleZh: "銀線灣別墅", titleEn: "Silverstrand Villa", block: "單號屋", floor: "全幢", unit: "連天台",
-        price: 48.0, grossArea: 2800, saleableArea: 2100, view: "銀線灣全海景", layout: "4房全套房", mgmt: "$4,500/月",
+        price: 48000, grossArea: 2800, saleableArea: 2100, view: "銀線灣全海景", layout: "4房全套房", mgmt: "$4,500/月",
         contactName: "李先生", contactPhone: "9123 8888", agentLicence: "S-200987", notes: "尊貴獨家放盤",
         photos: ["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&auto=format&fit=crop&q=60"]
       }
@@ -831,19 +831,17 @@
     };
 
     function loadPropertiesData() {
-      // 1. Load from localStorage first so user changes stick immediately
-      const localData = localStorage.getItem('wo_hing_properties_v3');
+      // Load local storage first for immediate rendering
+      const localData = localStorage.getItem('wo_hing_properties_v4');
       if (localData) {
         try {
           properties = JSON.parse(localData);
         } catch (e) {
           properties = defaultProperties;
         }
-      } else {
-        properties = defaultProperties;
       }
 
-      // 2. Try fetching from Supabase in the background if available
+      // Sync across all devices from Supabase live DB
       if (supabaseClient) {
         supabaseClient.from('properties').select('*').then(({ data, error }) => {
           if (!error && data && data.length > 0) {
@@ -858,7 +856,7 @@
               block: p.block,
               floor: p.floor,
               unit: p.unit,
-              price: p.price,
+              price: parseFloat(p.price),
               grossArea: p.gross_area,
               saleableArea: p.saleable_area,
               view: p.view,
@@ -876,7 +874,7 @@
             populateEAADropdown();
             renderDealRecords();
           }
-        }).catch(err => console.warn('Supabase sync warning:', err));
+        }).catch(err => console.warn('Supabase fetch notice:', err));
       }
 
       updateDashboardStats();
@@ -886,7 +884,7 @@
     }
 
     function savePropertiesToStorage() {
-      localStorage.setItem('wo_hing_properties_v3', JSON.stringify(properties));
+      localStorage.setItem('wo_hing_properties_v4', JSON.stringify(properties));
     }
 
     function switchTab(tabName) {
@@ -928,6 +926,22 @@
       document.getElementById('stat-avgprice').innerText = '$' + avgPrice.toLocaleString();
     }
 
+    // FORMAT PRICE: 萬 FOR SELLING, 千 FOR RENTING
+    function formatPriceDisplay(p) {
+      if (p.status === 'Rent' || p.status === 'Rented') {
+        let thousandVal = p.price >= 1000 ? (p.price / 1000) : p.price;
+        return currentLang === 'zh'
+          ? `$${thousandVal.toLocaleString()}千/月`
+          : `$${thousandVal.toLocaleString()}k/mo`;
+      } else {
+        // Selling
+        let wanVal = p.price > 1000 ? (p.price / 10000) : (p.price * 100); // 33.8M = 3380萬
+        return currentLang === 'zh'
+          ? `${wanVal.toLocaleString()}萬`
+          : `$${p.price.toLocaleString()}M`;
+      }
+    }
+
     function renderListings() {
       const districtFilter = document.getElementById('filter-district').value;
       const typeFilter = document.getElementById('filter-type').value;
@@ -949,13 +963,9 @@
       });
 
       filtered.forEach(p => {
-        // Price converted to thousands with 'k' or '千'
-        let priceInThousands = Math.round(p.price * 1000);
-        let priceDisplay = p.status === 'Rent' || p.status === 'Rented'
-          ? `$${Math.round(p.price * 1000000).toLocaleString()}/mo`
-          : `$${priceInThousands.toLocaleString()}${currentLang === 'zh' ? '千' : 'k'}`;
-
-        let saleablePriceSqft = p.saleableArea > 0 ? Math.round((p.price * 1000000) / p.saleableArea) : 0;
+        let priceDisplay = formatPriceDisplay(p);
+        let actualFullPrice = (p.status === 'Sale' || p.status === 'Sold') ? (p.price * 1000000) : p.price;
+        let saleablePriceSqft = p.saleableArea > 0 ? Math.round(actualFullPrice / p.saleableArea) : 0;
         let photoBadgeCount = p.photos ? p.photos.length : 0;
         let coverPhoto = (p.photos && p.photos.length > 0) ? p.photos[0] : 'https://placehold.co/100x75/e2e8f0/64748b?text=No+Photo';
 
@@ -1013,6 +1023,7 @@
 
     function calculateRates() {
       const price = parseFloat(document.getElementById('edit-price').value) || 0;
+      const status = document.getElementById('edit-status').value;
       const gross = parseFloat(document.getElementById('edit-grossArea').value) || 0;
       const saleable = parseFloat(document.getElementById('edit-saleableArea').value) || 0;
 
@@ -1022,8 +1033,9 @@
         document.getElementById('edit-efficiency').value = '-- %';
       }
 
-      if (price > 0 && saleable > 0) {
-        document.getElementById('edit-saleablePrice').value = '$' + Math.round((price * 1000000) / saleable).toLocaleString();
+      let fullPrice = (status === 'Rent' || status === 'Rented') ? price : (price * 1000000);
+      if (fullPrice > 0 && saleable > 0) {
+        document.getElementById('edit-saleablePrice').value = '$' + Math.round(fullPrice / saleable).toLocaleString();
       } else {
         document.getElementById('edit-saleablePrice').value = '$--';
       }
@@ -1071,11 +1083,15 @@
     }
 
     async function saveProperty(e) {
-      e.preventDefault();
-      const id = document.getElementById('edit-id').value || "SK-" + Date.now();
+      if (e) e.preventDefault();
       
+      const id = document.getElementById('edit-id').value || "SK-" + Date.now();
       const photoElements = document.querySelectorAll('.grid-photo-url');
       const photosList = Array.from(photoElements).map(el => el.value);
+
+      const priceVal = parseFloat(document.getElementById('edit-price').value) || 0;
+      const grossVal = parseInt(document.getElementById('edit-grossArea').value) || 0;
+      const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
 
       const propertyPayload = {
         id: id,
@@ -1088,9 +1104,9 @@
         block: document.getElementById('edit-block').value,
         floor: document.getElementById('edit-floor').value,
         unit: document.getElementById('edit-unit').value,
-        price: parseFloat(document.getElementById('edit-price').value),
-        gross_area: parseInt(document.getElementById('edit-grossArea').value) || 0,
-        saleable_area: parseInt(document.getElementById('edit-saleableArea').value),
+        price: priceVal,
+        gross_area: grossVal,
+        saleable_area: saleableVal,
         view: document.getElementById('edit-view').value,
         layout: document.getElementById('edit-layout').value,
         mgmt: document.getElementById('edit-mgmt').value,
@@ -1101,11 +1117,6 @@
         photos: photosList.length > 0 ? photosList : ["https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&auto=format&fit=crop&q=60"]
       };
 
-      if (supabaseClient) {
-        supabaseClient.from('properties').upsert(propertyPayload).catch(err => console.warn('Supabase upsert error:', err));
-      }
-
-      const existingIdx = properties.findIndex(p => p.id === id);
       const localObj = {
         id: propertyPayload.id,
         ref: propertyPayload.ref,
@@ -1130,14 +1141,25 @@
         photos: propertyPayload.photos
       };
 
+      // 1. Update in-memory local state
+      const existingIdx = properties.findIndex(p => p.id === id);
       if (existingIdx >= 0) {
         properties[existingIdx] = localObj;
       } else {
         properties.unshift(localObj);
       }
 
-      // Save to localStorage immediately so changes persist!
+      // 2. Save to local storage cache
       savePropertiesToStorage();
+
+      // 3. Save to live Supabase DB for all devices
+      if (supabaseClient) {
+        try {
+          await supabaseClient.from('properties').upsert(propertyPayload);
+        } catch (err) {
+          console.warn('Supabase save warning:', err);
+        }
+      }
 
       alert(currentLang === 'zh' ? '樓盤資料已成功儲存！' : 'Property saved successfully!');
       updateDashboardStats();
@@ -1150,7 +1172,11 @@
     async function deleteProperty(id) {
       if (confirm(currentLang === 'zh' ? '確定要刪除此樓盤資料嗎？' : 'Are you sure you want to delete this listing?')) {
         if (supabaseClient) {
-          supabaseClient.from('properties').delete().eq('id', id).catch(err => console.warn('Supabase delete error:', err));
+          try {
+            await supabaseClient.from('properties').delete().eq('id', id);
+          } catch (e) {
+            console.warn('Supabase delete error:', e);
+          }
         }
         properties = properties.filter(p => p.id !== id);
         savePropertiesToStorage();
@@ -1252,7 +1278,7 @@
       const dateStr = new Date().toLocaleDateString();
       const agentLic = p.agentLicence || (currentLang === 'zh' ? '未填報' : 'N/A');
       const estateName = currentLang === 'zh' ? p.titleZh : p.titleEn;
-      const priceInThousands = Math.round(p.price * 1000);
+      const priceDisplay = formatPriceDisplay(p);
 
       let formTitle = "";
       let formDesc = "";
@@ -1295,7 +1321,7 @@
           <p><strong>${currentLang === 'zh' ? '地址' : 'Address'}:</strong> ${p.district} - ${p.block || ''} ${p.floor || ''} ${p.unit || ''}</p>
           <p><strong>${currentLang === 'zh' ? '物業類型' : 'Type'}:</strong> ${p.type} | <strong>${currentLang === 'zh' ? '狀態' : 'Status'}:</strong> ${p.status}</p>
           <p><strong>${currentLang === 'zh' ? '實用面積' : 'Saleable Area'}:</strong> ${p.saleableArea} sq.ft | <strong>${currentLang === 'zh' ? '建築面積' : 'Gross Area'}:</strong> ${p.grossArea || '--'} sq.ft</p>
-          <p><strong>${currentLang === 'zh' ? '叫價 / 租金' : 'Asking Price / Rent'}:</strong> <span class="text-brand-800 font-bold">${priceInThousands.toLocaleString()}${currentLang === 'zh' ? '千 (HKD)' : 'k (HKD)'}</span></p>
+          <p><strong>${currentLang === 'zh' ? '叫價 / 租金' : 'Asking Price / Rent'}:</strong> <span class="text-brand-800 font-bold">${priceDisplay} (HKD)</span></p>
           <p><strong>${currentLang === 'zh' ? '景觀與特徵' : 'View & Features'}:</strong> ${p.view || '--'} | ${p.layout || '--'}</p>
         </div>
         <div class="pt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-[11px]">
@@ -1322,8 +1348,7 @@
       }
 
       closedDeals.forEach(p => {
-        let priceInThousands = Math.round(p.price * 1000);
-        let priceDisplay = p.status === 'Rented' ? `$${Math.round(p.price * 1000000).toLocaleString()}/mo` : `$${priceInThousands.toLocaleString()}${currentLang === 'zh' ? '千' : 'k'}`;
+        let priceDisplay = formatPriceDisplay(p);
         let statusBadge = p.status === 'Sold' ? `<span class="px-2 py-0.5 text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">${currentLang === 'zh' ? '已售' : 'Sold'}</span>` : `<span class="px-2 py-0.5 text-[11px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">${currentLang === 'zh' ? '已租' : 'Rented'}</span>`;
         
         let tr = document.createElement('tr');
