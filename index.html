@@ -1183,56 +1183,125 @@
     }
 
     async function saveProperty(e) {
-      if (e) e.preventDefault();
-      
-      const editId = document.getElementById('edit-id').value;
-      const photoElements = document.querySelectorAll('.grid-photo-url');
-      const photosList = Array.from(photoElements).map(el => el.value);
+     async function saveProperty(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 
-      const titleZh = document.getElementById('edit-titleZh').value.trim();
-      const priceVal = parseFloat(document.getElementById('edit-price').value) || 0;
-      const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
+  try {
+    const getVal = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : "";
+    };
 
-      if (!titleZh) {
-        alert(currentLang === 'zh' ? '請先輸入物業/屋苑名稱！' : 'Please enter a property name!');
-        document.getElementById('edit-titleZh').focus();
-        return;
-      }
+    const editId = getVal('edit-id');
+    const titleZh = getVal('edit-titleZh');
+    const titleEn = getVal('edit-titleEn');
+    const priceVal = parseFloat(getVal('edit-price')) || 0;
+    const saleableVal = parseInt(getVal('edit-saleableArea')) || 0;
 
-      const localObj = {
-        id: editId || "",
-        ref: "",
-        status: document.getElementById('edit-status').value,
-        district: document.getElementById('edit-district').value,
-        type: document.getElementById('edit-type').value,
-        titleZh: titleZh,
-        titleEn: document.getElementById('edit-titleEn').value.trim() || titleZh,
-        block: document.getElementById('edit-block').value,
-        floor: document.getElementById('edit-floor').value,
-        unit: document.getElementById('edit-unit').value,
-        price: priceVal,
-        grossArea: parseInt(document.getElementById('edit-grossArea').value) || 0,
-        saleableArea: saleableVal,
-        view: document.getElementById('edit-view').value,
-        layout: document.getElementById('edit-layout').value,
-        mgmt: document.getElementById('edit-mgmt').value,
-        contactName: document.getElementById('edit-contactName').value,
-        contactPhone: document.getElementById('edit-contactPhone').value,
-        agentLicence: document.getElementById('edit-agentLicence').value,
-        notes: document.getElementById('edit-notes').value,
-        photos: photosList
-      };
+    // Check minimum required field
+    if (!titleZh) {
+      alert(currentLang === 'zh' ? '請先輸入物業/屋苑名稱！' : 'Please enter a property name!');
+      const titleEl = document.getElementById('edit-titleZh');
+      if (titleEl) titleEl.focus();
+      return;
+    }
 
-      if (editId) {
-        const existingIdx = properties.findIndex(p => p.id === editId);
-        if (existingIdx >= 0) {
-          localObj.ref = properties[existingIdx].ref;
-          localObj.id = properties[existingIdx].id;
-          properties[existingIdx] = localObj;
-        }
+    // Collect images safely
+    const photoElements = document.querySelectorAll('.grid-photo-url');
+    const photosList = Array.from(photoElements).map(el => el.value);
+
+    const localObj = {
+      id: editId || "",
+      ref: getVal('edit-ref'),
+      status: getVal('edit-status') || "Sale",
+      district: getVal('edit-district') || "Sai Kung Town",
+      type: getVal('edit-type') || "Flat",
+      titleZh: titleZh,
+      titleEn: titleEn || titleZh,
+      block: getVal('edit-block'),
+      floor: getVal('edit-floor'),
+      unit: getVal('edit-unit'),
+      price: priceVal,
+      grossArea: parseInt(getVal('edit-grossArea')) || 0,
+      saleableArea: saleableVal,
+      view: getVal('edit-view'),
+      layout: getVal('edit-layout'),
+      mgmt: getVal('edit-mgmt'),
+      contactName: getVal('edit-contactName'),
+      contactPhone: getVal('edit-contactPhone'),
+      agentLicence: getVal('edit-agentLicence'),
+      notes: getVal('edit-notes'),
+      photos: photosList
+    };
+
+    if (editId) {
+      const existingIdx = properties.findIndex(p => p.id === editId || p.ref === editId);
+      if (existingIdx >= 0) {
+        localObj.ref = properties[existingIdx].ref;
+        localObj.id = properties[existingIdx].id;
+        properties[existingIdx] = localObj;
       } else {
         properties.push(localObj);
       }
+    } else {
+      properties.push(localObj);
+    }
+
+    // 1. Re-index and save to Local Storage immediately
+    reindexProperties();
+    savePropertiesToStorage();
+
+    // 2. Trigger confirmation alert immediately
+    alert(currentLang === 'zh' ? '【成功儲存】樓盤資料及相片已成功更新！' : '[SAVED] Property & photo details saved successfully!');
+
+    // 3. Refresh interface views
+    updateDashboardStats();
+    renderListings();
+    populateEAADropdown();
+    renderDealRecords();
+    switchTab('index');
+
+    // 4. Background sync to Supabase without blocking the UI
+    if (supabaseClient) {
+      try {
+        const payload = properties.map(p => ({
+          id: String(p.id),
+          ref: String(p.ref),
+          status: p.status,
+          district: p.district,
+          type: p.type,
+          title_zh: p.titleZh,
+          title_en: p.titleEn,
+          block: p.block,
+          floor: p.floor,
+          unit: p.unit,
+          price: p.price,
+          gross_area: p.grossArea,
+          saleable_area: p.saleableArea,
+          view: p.view,
+          layout: p.layout,
+          mgmt: p.mgmt,
+          contact_name: p.contactName,
+          contact_phone: p.contactPhone,
+          agent_licence: p.agentLicence,
+          notes: p.notes,
+          photos: p.photos
+        }));
+        supabaseClient.from('properties').upsert(payload).then();
+      } catch (dbErr) {
+        console.warn('Database background sync notice:', dbErr);
+      }
+    }
+
+  } catch (err) {
+    // If any unexpected error occurs, alert the exact message
+    alert('Save Error: ' + err.message);
+    console.error('saveProperty exception:', err);
+  }
+}
 
       // Re-sequence all references consecutively (SK-001, SK-002...)
       reindexProperties();
