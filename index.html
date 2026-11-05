@@ -1185,86 +1185,103 @@
     }
 
     async function saveProperty(e) {
-      if (e) e.preventDefault();
-      
-      const editId = document.getElementById('edit-id').value;
-      const photoElements = document.querySelectorAll('.grid-photo-url');
-      const photosList = Array.from(photoElements).map(el => el.value);
+async function saveProperty(e) {
+  if (e) e.preventDefault();
+  
+  const editId = document.getElementById('edit-id').value;
+  const photoElements = document.querySelectorAll('.grid-photo-url');
+  const photosList = Array.from(photoElements).map(el => el.value);
 
-      const priceVal = parseFloat(document.getElementById('edit-price').value) || 0;
-      const grossVal = parseInt(document.getElementById('edit-grossArea').value) || 0;
-      const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
+  const titleZh = document.getElementById('edit-titleZh').value.trim();
+  const priceVal = parseFloat(document.getElementById('edit-price').value) || 0;
+  const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
 
-      const localObj = {
-        id: editId || "",
-        ref: "",
-        status: document.getElementById('edit-status').value,
-        district: document.getElementById('edit-district').value,
-        type: document.getElementById('edit-type').value,
-        titleZh: document.getElementById('edit-titleZh').value,
-        titleEn: document.getElementById('edit-titleEn').value,
-        block: document.getElementById('edit-block').value,
-        floor: document.getElementById('edit-floor').value,
-        unit: document.getElementById('edit-unit').value,
-        price: priceVal,
-        grossArea: grossVal,
-        saleableArea: saleableVal,
-        view: document.getElementById('edit-view').value,
-        layout: document.getElementById('edit-layout').value,
-        mgmt: document.getElementById('edit-mgmt').value,
-        contactName: document.getElementById('edit-contactName').value,
-        contactPhone: document.getElementById('edit-contactPhone').value,
-        agentLicence: document.getElementById('edit-agentLicence').value,
-        notes: document.getElementById('edit-notes').value,
-        photos: photosList
-      };
+  // Basic validation check alert if title is missing
+  if (!titleZh) {
+    alert(currentLang === 'zh' ? '請輸入物業/屋苑名稱！' : 'Please enter property name!');
+    document.getElementById('edit-titleZh').focus();
+    return;
+  }
 
-      if (editId) {
-        const existingIdx = properties.findIndex(p => p.id === editId);
-        if (existingIdx >= 0) {
-          localObj.ref = properties[existingIdx].ref;
-          localObj.id = properties[existingIdx].id;
-          properties[existingIdx] = localObj;
-        }
-      } else {
-        properties.push(localObj);
+  const localObj = {
+    id: editId || "",
+    ref: "",
+    status: document.getElementById('edit-status').value,
+    district: document.getElementById('edit-district').value,
+    type: document.getElementById('edit-type').value,
+    titleZh: titleZh,
+    titleEn: document.getElementById('edit-titleEn').value.trim() || titleZh,
+    block: document.getElementById('edit-block').value,
+    floor: document.getElementById('edit-floor').value,
+    unit: document.getElementById('edit-unit').value,
+    price: priceVal,
+    grossArea: parseInt(document.getElementById('edit-grossArea').value) || 0,
+    saleableArea: saleableVal,
+    view: document.getElementById('edit-view').value,
+    layout: document.getElementById('edit-layout').value,
+    mgmt: document.getElementById('edit-mgmt').value,
+    contactName: document.getElementById('edit-contactName').value,
+    contactPhone: document.getElementById('edit-contactPhone').value,
+    agentLicence: document.getElementById('edit-agentLicence').value,
+    notes: document.getElementById('edit-notes').value,
+    photos: photosList
+  };
+
+  if (editId) {
+    const existingIdx = properties.findIndex(p => p.id === editId);
+    if (existingIdx >= 0) {
+      localObj.ref = properties[existingIdx].ref;
+      localObj.id = properties[existingIdx].id;
+      properties[existingIdx] = localObj;
+    }
+  } else {
+    properties.push(localObj);
+  }
+
+  // 1. Immediately reindex and save to Local Storage (Instant UX response)
+  reindexProperties();
+  savePropertiesToStorage();
+
+  alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
+  updateDashboardStats();
+  renderListings();
+  populateEAADropdown();
+  renderDealRecords();
+  switchTab('index');
+
+  // 2. Background sync to Supabase without blocking the UI
+  if (supabaseClient) {
+    try {
+      for (let p of properties) {
+        supabaseClient.from('properties').upsert({
+          id: p.id,
+          ref: p.ref,
+          status: p.status,
+          district: p.district,
+          type: p.type,
+          title_zh: p.titleZh,
+          title_en: p.titleEn,
+          block: p.block,
+          floor: p.floor,
+          unit: p.unit,
+          price: p.price,
+          gross_area: p.grossArea,
+          saleable_area: p.saleableArea,
+          view: p.view,
+          layout: p.layout,
+          mgmt: p.mgmt,
+          contact_name: p.contactName,
+          contact_phone: p.contactPhone,
+          agent_licence: p.agentLicence,
+          notes: p.notes,
+          photos: p.photos
+        }).then();
       }
-
-      // Re-sequence all references consecutively
-      reindexProperties();
-      savePropertiesToStorage();
-
-      // Sync to Supabase
-      if (supabaseClient) {
-        try {
-          for (let p of properties) {
-            await supabaseClient.from('properties').upsert({
-              id: p.id,
-              ref: p.ref,
-              status: p.status,
-              district: p.district,
-              type: p.type,
-              title_zh: p.titleZh,
-              title_en: p.titleEn,
-              block: p.block,
-              floor: p.floor,
-              unit: p.unit,
-              price: p.price,
-              gross_area: p.grossArea,
-              saleable_area: p.saleableArea,
-              view: p.view,
-              layout: p.layout,
-              mgmt: p.mgmt,
-              contact_name: p.contactName,
-              contact_phone: p.contactPhone,
-              agent_licence: p.agentLicence,
-              notes: p.notes,
-              photos: p.photos
-            });
-          }
-        } catch (err) {
-          console.warn('Supabase save warning:', err);
-        }
+    } catch (err) {
+      console.warn('Supabase sync background warning:', err);
+    }
+  }
+}
       }
 
       alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
