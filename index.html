@@ -851,7 +851,7 @@
         c_dutytitle: "Estimated Stamp Duty:",
         c_duty_desc: "* Calculated based on latest Hong Kong AVD Scale 2 rates. Actual duty subject to IRD verification.",
         footer_name: "Wo Hing Property Agency",
-        footer_desc: "Specializing inSai Kung Town, Clear Water Bay Villas, Silverstrand Mansions, Pak Sha Wan Village Houses & Parking"
+        footer_desc: "Specializing in Sai Kung Town, Clear Water Bay Villas, Silverstrand Mansions, Pak Sha Wan Village Houses & Parking"
       }
     };
 
@@ -884,24 +884,8 @@
       renderDealRecords();
     }
 
-    const defaultProperties = [
-      {
-        id: "SK-001", ref: "SK-001", status: "Sale", district: "Marina Cove", type: "Detached House",
-        titleZh: "匡湖居 K段獨立屋", titleEn: "Marina Cove Section K Villa", block: "K段", floor: "全幢", unit: "雙號屋",
-        price: 33.8, grossArea: 1900, saleableArea: 1350, view: "船泊位游艇海景", layout: "4房2套", mgmt: "$3,800/月",
-        contactName: "張小姐", contactPhone: "9876 5432", agentLicence: "S-100234", notes: "附設私人船泊位",
-        photos: ["https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&auto=format&fit=crop&q=60"]
-      },
-      {
-        id: "SK-002", ref: "SK-002", status: "Rent", district: "Silverstrand", type: "Detached House",
-        titleZh: "銀線灣別墅", titleEn: "Silverstrand Villa", block: "單號屋", floor: "全幢", unit: "連天台",
-        price: 48000, grossArea: 2800, saleableArea: 2100, view: "銀線灣全海景", layout: "4房全套房", mgmt: "$4,500/月",
-        contactName: "李先生", contactPhone: "9123 8888", agentLicence: "S-200987", notes: "尊貴獨家放盤",
-        photos: ["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&auto=format&fit=crop&q=60"]
-      }
-    ];
-
-    let properties = defaultProperties;
+    // EMPTY BASELINE — NO DEMO PROPERTIES PRE-POPULATED
+    let properties = [];
     let currentEAAFormType = 'form3';
 
     window.onload = function() {
@@ -911,13 +895,25 @@
     };
 
     function loadPropertiesData() {
-      const localData = localStorage.getItem('wo_hing_properties_v7');
-      if (localData) {
-        try {
-          properties = JSON.parse(localData);
-        } catch (e) {
-          properties = defaultProperties;
+      // Check across all local storage versions to recover any previously user-saved data
+      const localDataKeys = ['wo_hing_properties_v7', 'wo_hing_properties_v6', 'wo_hing_properties_v5', 'wo_hing_properties'];
+      let foundLocalData = null;
+
+      for (let key of localDataKeys) {
+        const data = localStorage.getItem(key);
+        if (data) {
+          try {
+            const parsed = JSON.parse(data);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              foundLocalData = parsed;
+              break;
+            }
+          } catch (e) {}
         }
+      }
+
+      if (foundLocalData) {
+        properties = foundLocalData;
       }
 
       if (supabaseClient) {
@@ -968,7 +964,7 @@
       properties.forEach((p, index) => {
         const seq = String(index + 1).padStart(3, '0');
         p.ref = `SK-${seq}`;
-        p.id = p.ref; // Keep ID tied to consecutive ref for clean database upsert
+        p.id = p.ref; 
       });
     }
 
@@ -1050,6 +1046,12 @@
 
       const tbody = document.getElementById('listing-table-body');
       tbody.innerHTML = '';
+
+      if (properties.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-slate-400 font-medium">${currentLang === 'zh' ? '目前沒有樓盤資料。請按 F1 或按鈕「新增空白樓盤」開始輸入。' : 'No properties found. Press F1 or "New Listing" to start.'}</td></tr>`;
+        document.getElementById('showing-count').innerText = currentLang === 'zh' ? '顯示 0 個樓盤' : 'Showing 0 listings';
+        return;
+      }
 
       let filtered = properties.filter(p => {
         if (districtFilter !== 'ALL' && p.district !== districtFilter) return false;
@@ -1214,7 +1216,7 @@
         contactPhone: document.getElementById('edit-contactPhone').value,
         agentLicence: document.getElementById('edit-agentLicence').value,
         notes: document.getElementById('edit-notes').value,
-        photos: photosList.length > 0 ? photosList : ["https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&auto=format&fit=crop&q=60"]
+        photos: photosList
       };
 
       if (editId) {
@@ -1265,7 +1267,7 @@
         }
       }
 
-      alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存並自動編號！' : 'Property & photos saved & re-indexed successfully!');
+      alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
       updateDashboardStats();
       renderListings();
       populateEAADropdown();
@@ -1282,7 +1284,6 @@
         if (supabaseClient) {
           try {
             await supabaseClient.from('properties').delete().eq('id', id);
-            // Re-sync all remaining items to update Supabase references
             for (let p of properties) {
               await supabaseClient.from('properties').upsert({
                 id: p.id,
@@ -1387,6 +1388,13 @@
     function populateEAADropdown() {
       const select = document.getElementById('eaa-property-select');
       select.innerHTML = '';
+      if (properties.length === 0) {
+        let opt = document.createElement('option');
+        opt.value = "";
+        opt.innerText = currentLang === 'zh' ? "-- 暫無可選樓盤 --" : "-- No Properties --";
+        select.appendChild(opt);
+        return;
+      }
       properties.forEach(p => {
         let opt = document.createElement('option');
         opt.value = p.id;
@@ -1417,7 +1425,10 @@
       const selectedId = document.getElementById('eaa-property-select').value;
       const p = properties.find(item => item.id === selectedId) || properties[0];
       const formContainer = document.getElementById('printable-form');
-      if (!p) return;
+      if (!p) {
+        formContainer.innerHTML = `<div class="text-center text-slate-400 py-12">${currentLang === 'zh' ? '請先新增樓盤資料以生成 EAA 表格。' : 'Please add property listings first.'}</div>`;
+        return;
+      }
       const dateStr = new Date().toLocaleDateString();
       const agentLic = p.agentLicence || (currentLang === 'zh' ? '未填報' : 'N/A');
       const estateName = currentLang === 'zh' ? p.titleZh : p.titleEn;
