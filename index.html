@@ -261,8 +261,8 @@
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3.5">
           <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_ref">樓盤編號 *</label>
-            <input type="text" id="edit-ref" required class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none font-semibold" placeholder="SK-001"/>
+            <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_ref">樓盤編號 (自動順序編號) *</label>
+            <input type="text" id="edit-ref" readonly class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-slate-100 outline-none font-semibold text-brand-800" placeholder="SK-001"/>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_status">放盤狀態 *</label>
@@ -299,12 +299,13 @@
           </div>
         </div>
 
-        <!-- COMPLETE SAI KUNG VILLAGES & ESTATES QUICK SELECTOR -->
+        <!-- QUICK SELECT VILLAGES & ESTATES (INCLUDING LAKESIDE GARDEN) -->
         <div class="p-3 bg-brand-50/60 border border-brand-200/80">
           <label class="block text-xs font-bold text-brand-800 mb-1">快速選擇西貢著名村落或豪苑/屋苑 (Quick Select Village or Housing Estate):</label>
           <select id="quick-estate-select" onchange="applyQuickEstate(this.value)" class="w-full text-xs md:text-sm border border-slate-200 p-2 bg-white outline-none">
             <option value="">-- 請選擇西貢村落或屋苑 (Choose Sai Kung Village or Estate) --</option>
             <optgroup label="🏢 著名豪宅及私人屋苑 (Major Housing & Estates)">
+              <option value="翠塘花園 (Lakeside Garden)|Lakeside Garden|Sai Kung Town|Flat">翠塘花園 Lakeside Garden</option>
               <option value="匡湖居 (Marina Cove)|Marina Cove|Marina Cove|Detached House">匡湖居 Marina Cove</option>
               <option value="傲瀧 (Mount Pavilia)|Mount Pavilia|Pak Sha Wan|Flat">傲瀧 Mount Pavilia</option>
               <option value="逸瓏海匯 (Park Mediterranean)|Park Mediterranean|Sai Kung Town|Flat">逸瓏海匯 Park Mediterranean</option>
@@ -710,7 +711,7 @@
         form_title: "樓盤資料與多媒體編輯",
         btn_new: "新增空白樓盤",
         btn_save: "儲存資料",
-        f_ref: "樓盤編號 *",
+        f_ref: "樓盤編號 (自動順序編號) *",
         f_status: "放盤狀態 *",
         f_district: "地區 *",
         f_type: "物業類型 *",
@@ -804,7 +805,7 @@
         form_title: "Property Details & Media Editor",
         btn_new: "New Listing",
         btn_save: "Save Data",
-        f_ref: "Ref No. *",
+        f_ref: "Ref No. (Auto-Sequential) *",
         f_status: "Status *",
         f_district: "District *",
         f_type: "Type *",
@@ -850,7 +851,7 @@
         c_dutytitle: "Estimated Stamp Duty:",
         c_duty_desc: "* Calculated based on latest Hong Kong AVD Scale 2 rates. Actual duty subject to IRD verification.",
         footer_name: "Wo Hing Property Agency",
-        footer_desc: "Specializing in Sai Kung Town, Clear Water Bay Villas, Silverstrand Mansions, Pak Sha Wan Village Houses & Parking"
+        footer_desc: "Specializing inSai Kung Town, Clear Water Bay Villas, Silverstrand Mansions, Pak Sha Wan Village Houses & Parking"
       }
     };
 
@@ -910,7 +911,7 @@
     };
 
     function loadPropertiesData() {
-      const localData = localStorage.getItem('wo_hing_properties_v6');
+      const localData = localStorage.getItem('wo_hing_properties_v7');
       if (localData) {
         try {
           properties = JSON.parse(localData);
@@ -945,6 +946,7 @@
               notes: p.notes,
               photos: p.photos || []
             }));
+            reindexProperties();
             savePropertiesToStorage();
             updateDashboardStats();
             renderListings();
@@ -954,14 +956,24 @@
         }).catch(err => console.warn('Supabase fetch notice:', err));
       }
 
+      reindexProperties();
       updateDashboardStats();
       renderListings();
       populateEAADropdown();
       renderDealRecords();
     }
 
+    // AUTO-REINDEX CONSECUTIVE SK-001, SK-002, SK-003...
+    function reindexProperties() {
+      properties.forEach((p, index) => {
+        const seq = String(index + 1).padStart(3, '0');
+        p.ref = `SK-${seq}`;
+        p.id = p.ref; // Keep ID tied to consecutive ref for clean database upsert
+      });
+    }
+
     function savePropertiesToStorage() {
-      localStorage.setItem('wo_hing_properties_v6', JSON.stringify(properties));
+      localStorage.setItem('wo_hing_properties_v7', JSON.stringify(properties));
     }
 
     function applyQuickEstate(val) {
@@ -1161,10 +1173,10 @@
     }
 
     function createNewProperty() {
-      const newRef = "SK-" + String(properties.length + 1).padStart(3, '0');
+      const nextSeq = String(properties.length + 1).padStart(3, '0');
       document.getElementById('property-form').reset();
       document.getElementById('edit-id').value = '';
-      document.getElementById('edit-ref').value = newRef;
+      document.getElementById('edit-ref').value = `SK-${nextSeq}`;
       document.getElementById('form-title-text').innerText = currentLang === 'zh' ? "新增樓盤資料" : "New Property Listing";
       renderPhotoGrid([]);
       switchTab('edit');
@@ -1173,7 +1185,7 @@
     async function saveProperty(e) {
       if (e) e.preventDefault();
       
-      const id = document.getElementById('edit-id').value || "SK-" + Date.now();
+      const editId = document.getElementById('edit-id').value;
       const photoElements = document.querySelectorAll('.grid-photo-url');
       const photosList = Array.from(photoElements).map(el => el.value);
 
@@ -1181,72 +1193,79 @@
       const grossVal = parseInt(document.getElementById('edit-grossArea').value) || 0;
       const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
 
-      const propertyPayload = {
-        id: id,
-        ref: document.getElementById('edit-ref').value,
+      const localObj = {
+        id: editId || "",
+        ref: "",
         status: document.getElementById('edit-status').value,
         district: document.getElementById('edit-district').value,
         type: document.getElementById('edit-type').value,
-        title_zh: document.getElementById('edit-titleZh').value,
-        title_en: document.getElementById('edit-titleEn').value,
+        titleZh: document.getElementById('edit-titleZh').value,
+        titleEn: document.getElementById('edit-titleEn').value,
         block: document.getElementById('edit-block').value,
         floor: document.getElementById('edit-floor').value,
         unit: document.getElementById('edit-unit').value,
         price: priceVal,
-        gross_area: grossVal,
-        saleable_area: saleableVal,
+        grossArea: grossVal,
+        saleableArea: saleableVal,
         view: document.getElementById('edit-view').value,
         layout: document.getElementById('edit-layout').value,
         mgmt: document.getElementById('edit-mgmt').value,
-        contact_name: document.getElementById('edit-contactName').value,
-        contact_phone: document.getElementById('edit-contactPhone').value,
-        agent_licence: document.getElementById('edit-agentLicence').value,
+        contactName: document.getElementById('edit-contactName').value,
+        contactPhone: document.getElementById('edit-contactPhone').value,
+        agentLicence: document.getElementById('edit-agentLicence').value,
         notes: document.getElementById('edit-notes').value,
         photos: photosList.length > 0 ? photosList : ["https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=800&auto=format&fit=crop&q=60"]
       };
 
-      const localObj = {
-        id: propertyPayload.id,
-        ref: propertyPayload.ref,
-        status: propertyPayload.status,
-        district: propertyPayload.district,
-        type: propertyPayload.type,
-        titleZh: propertyPayload.title_zh,
-        titleEn: propertyPayload.title_en,
-        block: propertyPayload.block,
-        floor: propertyPayload.floor,
-        unit: propertyPayload.unit,
-        price: propertyPayload.price,
-        grossArea: propertyPayload.gross_area,
-        saleableArea: propertyPayload.saleable_area,
-        view: propertyPayload.view,
-        layout: propertyPayload.layout,
-        mgmt: propertyPayload.mgmt,
-        contactName: propertyPayload.contact_name,
-        contactPhone: propertyPayload.contact_phone,
-        agentLicence: propertyPayload.agent_licence,
-        notes: propertyPayload.notes,
-        photos: propertyPayload.photos
-      };
-
-      const existingIdx = properties.findIndex(p => p.id === id);
-      if (existingIdx >= 0) {
-        properties[existingIdx] = localObj;
+      if (editId) {
+        const existingIdx = properties.findIndex(p => p.id === editId);
+        if (existingIdx >= 0) {
+          localObj.ref = properties[existingIdx].ref;
+          localObj.id = properties[existingIdx].id;
+          properties[existingIdx] = localObj;
+        }
       } else {
-        properties.unshift(localObj);
+        properties.push(localObj);
       }
 
+      // Re-sequence all references consecutively
+      reindexProperties();
       savePropertiesToStorage();
 
+      // Sync to Supabase
       if (supabaseClient) {
         try {
-          await supabaseClient.from('properties').upsert(propertyPayload);
+          for (let p of properties) {
+            await supabaseClient.from('properties').upsert({
+              id: p.id,
+              ref: p.ref,
+              status: p.status,
+              district: p.district,
+              type: p.type,
+              title_zh: p.titleZh,
+              title_en: p.titleEn,
+              block: p.block,
+              floor: p.floor,
+              unit: p.unit,
+              price: p.price,
+              gross_area: p.grossArea,
+              saleable_area: p.saleableArea,
+              view: p.view,
+              layout: p.layout,
+              mgmt: p.mgmt,
+              contact_name: p.contactName,
+              contact_phone: p.contactPhone,
+              agent_licence: p.agentLicence,
+              notes: p.notes,
+              photos: p.photos
+            });
+          }
         } catch (err) {
           console.warn('Supabase save warning:', err);
         }
       }
 
-      alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
+      alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存並自動編號！' : 'Property & photos saved & re-indexed successfully!');
       updateDashboardStats();
       renderListings();
       populateEAADropdown();
@@ -1255,16 +1274,45 @@
     }
 
     async function deleteProperty(id) {
-      if (confirm(currentLang === 'zh' ? '確定要刪除此樓盤資料嗎？' : 'Are you sure you want to delete this listing?')) {
+      if (confirm(currentLang === 'zh' ? '確定要刪除此樓盤資料嗎？刪除後編號將自動重新排序。' : 'Are you sure you want to delete this listing? Reference numbers will auto-resequence.')) {
+        properties = properties.filter(p => p.id !== id);
+        reindexProperties();
+        savePropertiesToStorage();
+
         if (supabaseClient) {
           try {
             await supabaseClient.from('properties').delete().eq('id', id);
+            // Re-sync all remaining items to update Supabase references
+            for (let p of properties) {
+              await supabaseClient.from('properties').upsert({
+                id: p.id,
+                ref: p.ref,
+                status: p.status,
+                district: p.district,
+                type: p.type,
+                title_zh: p.titleZh,
+                title_en: p.titleEn,
+                block: p.block,
+                floor: p.floor,
+                unit: p.unit,
+                price: p.price,
+                gross_area: p.grossArea,
+                saleable_area: p.saleableArea,
+                view: p.view,
+                layout: p.layout,
+                mgmt: p.mgmt,
+                contact_name: p.contactName,
+                contact_phone: p.contactPhone,
+                agent_licence: p.agentLicence,
+                notes: p.notes,
+                photos: p.photos
+              });
+            }
           } catch (e) {
             console.warn('Supabase delete error:', e);
           }
         }
-        properties = properties.filter(p => p.id !== id);
-        savePropertiesToStorage();
+
         updateDashboardStats();
         renderListings();
         populateEAADropdown();
