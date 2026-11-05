@@ -251,8 +251,8 @@
             <button type="button" onclick="createNewProperty()" class="cursor-pointer px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition">
               <i class="fa-solid fa-plus mr-1"></i> <span data-i18n="btn_new">新增空白樓盤</span>
             </button>
-            <button type="submit" id="btn-submit-form" class="cursor-pointer px-4 py-2 bg-brand-800 hover:bg-brand-900 text-white text-xs font-semibold transition">
-              <i class="fa-solid fa-floppy-disk mr-1"></i> <span data-i18n="btn_save">儲存資料</span>
+            <button type="button" onclick="saveProperty(event)" id="btn-submit-form" class="cursor-pointer px-4 py-2 bg-brand-800 hover:bg-brand-900 text-white text-xs font-semibold transition">
+              <i class="fa-solid fa-floppy-disk mr-1"></i> <span data-i18n="btn_save">儲存資料 Save</span>
             </button>
           </div>
         </div>
@@ -266,7 +266,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_status">放盤狀態 *</label>
-            <select id="edit-status" required class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none">
+            <select id="edit-status" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none">
               <option value="Sale" data-i18n="opt_forsale">出售</option>
               <option value="Rent" data-i18n="opt_forrent">出租</option>
               <option value="Sold" data-i18n="opt_sold">已售</option>
@@ -275,7 +275,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_district">地區 *</label>
-            <select id="edit-district" required class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none">
+            <select id="edit-district" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none">
               <option value="Sai Kung Town">西貢市中心 Sai Kung Town</option>
               <option value="Clear Water Bay">清水灣 Clear Water Bay</option>
               <option value="Silverstrand">銀線灣 Silverstrand</option>
@@ -289,7 +289,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_type">物業類型 *</label>
-            <select id="edit-type" required class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none">
+            <select id="edit-type" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none">
               <option value="Village House" data-i18n="opt_vill">村屋</option>
               <option value="Detached House" data-i18n="opt_det">獨立屋</option>
               <option value="Flat" data-i18n="opt_flat">住宅單位</option>
@@ -375,11 +375,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_titlezh">中文物業/屋苑名稱 *</label>
-            <input type="text" id="edit-titleZh" required class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none" placeholder="例：匡湖居 K段獨立屋"/>
+            <input type="text" id="edit-titleZh" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none" placeholder="例：匡湖居 K段獨立屋"/>
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_titleen">英文物業/屋苑名稱 *</label>
-            <input type="text" id="edit-titleEn" required class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none" placeholder="e.g. Marina Cove Marina Villa"/>
+            <input type="text" id="edit-titleEn" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-brand-50/50 outline-none" placeholder="e.g. Marina Cove Marina Villa"/>
           </div>
         </div>
 
@@ -405,7 +405,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_price">叫價 ($M / 月租) *</label>
-              <input type="number" step="any" id="edit-price" required oninput="calculateRates()" class="w-full text-xs md:text-sm font-bold border border-slate-200 p-2.5 text-brand-800 bg-white outline-none" placeholder="19.8 (出售百萬) 或 28000 (出租)"/>
+              <input type="number" step="any" id="edit-price" oninput="calculateRates()" class="w-full text-xs md:text-sm font-bold border border-slate-200 p-2.5 text-brand-800 bg-white outline-none" placeholder="19.8 (出售百萬) 或 28000 (出租)"/>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_gross">建築面積 (平方呎)</label>
@@ -413,7 +413,7 @@
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_saleable">實用面積 (平方呎) *</label>
-              <input type="number" id="edit-saleableArea" required oninput="calculateRates()" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-white outline-none" placeholder="1400"/>
+              <input type="number" id="edit-saleableArea" oninput="calculateRates()" class="w-full text-xs md:text-sm border border-slate-200 p-2.5 bg-white outline-none" placeholder="1400"/>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1" data-i18n="f_eff">實用率</label>
@@ -710,7 +710,7 @@
         hk_eaa: "表格",
         form_title: "樓盤資料與多媒體編輯",
         btn_new: "新增空白樓盤",
-        btn_save: "儲存資料",
+        btn_save: "儲存資料 Save",
         f_ref: "樓盤編號 (自動順序編號) *",
         f_status: "放盤狀態 *",
         f_district: "地區 *",
@@ -884,7 +884,6 @@
       renderDealRecords();
     }
 
-    // EMPTY BASELINE — NO DEMO PROPERTIES PRE-POPULATED
     let properties = [];
     let currentEAAFormType = 'form3';
 
@@ -895,7 +894,6 @@
     };
 
     function loadPropertiesData() {
-      // Check across all local storage versions to recover any previously user-saved data
       const localDataKeys = ['wo_hing_properties_v7', 'wo_hing_properties_v6', 'wo_hing_properties_v5', 'wo_hing_properties'];
       let foundLocalData = null;
 
@@ -1185,104 +1183,60 @@
     }
 
     async function saveProperty(e) {
-async function saveProperty(e) {
-  if (e) e.preventDefault();
-  
-  const editId = document.getElementById('edit-id').value;
-  const photoElements = document.querySelectorAll('.grid-photo-url');
-  const photosList = Array.from(photoElements).map(el => el.value);
+      if (e) e.preventDefault();
+      
+      const editId = document.getElementById('edit-id').value;
+      const photoElements = document.querySelectorAll('.grid-photo-url');
+      const photosList = Array.from(photoElements).map(el => el.value);
 
-  const titleZh = document.getElementById('edit-titleZh').value.trim();
-  const priceVal = parseFloat(document.getElementById('edit-price').value) || 0;
-  const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
+      const titleZh = document.getElementById('edit-titleZh').value.trim();
+      const priceVal = parseFloat(document.getElementById('edit-price').value) || 0;
+      const saleableVal = parseInt(document.getElementById('edit-saleableArea').value) || 0;
 
-  // Basic validation check alert if title is missing
-  if (!titleZh) {
-    alert(currentLang === 'zh' ? '請輸入物業/屋苑名稱！' : 'Please enter property name!');
-    document.getElementById('edit-titleZh').focus();
-    return;
-  }
-
-  const localObj = {
-    id: editId || "",
-    ref: "",
-    status: document.getElementById('edit-status').value,
-    district: document.getElementById('edit-district').value,
-    type: document.getElementById('edit-type').value,
-    titleZh: titleZh,
-    titleEn: document.getElementById('edit-titleEn').value.trim() || titleZh,
-    block: document.getElementById('edit-block').value,
-    floor: document.getElementById('edit-floor').value,
-    unit: document.getElementById('edit-unit').value,
-    price: priceVal,
-    grossArea: parseInt(document.getElementById('edit-grossArea').value) || 0,
-    saleableArea: saleableVal,
-    view: document.getElementById('edit-view').value,
-    layout: document.getElementById('edit-layout').value,
-    mgmt: document.getElementById('edit-mgmt').value,
-    contactName: document.getElementById('edit-contactName').value,
-    contactPhone: document.getElementById('edit-contactPhone').value,
-    agentLicence: document.getElementById('edit-agentLicence').value,
-    notes: document.getElementById('edit-notes').value,
-    photos: photosList
-  };
-
-  if (editId) {
-    const existingIdx = properties.findIndex(p => p.id === editId);
-    if (existingIdx >= 0) {
-      localObj.ref = properties[existingIdx].ref;
-      localObj.id = properties[existingIdx].id;
-      properties[existingIdx] = localObj;
-    }
-  } else {
-    properties.push(localObj);
-  }
-
-  // 1. Immediately reindex and save to Local Storage (Instant UX response)
-  reindexProperties();
-  savePropertiesToStorage();
-
-  alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
-  updateDashboardStats();
-  renderListings();
-  populateEAADropdown();
-  renderDealRecords();
-  switchTab('index');
-
-  // 2. Background sync to Supabase without blocking the UI
-  if (supabaseClient) {
-    try {
-      for (let p of properties) {
-        supabaseClient.from('properties').upsert({
-          id: p.id,
-          ref: p.ref,
-          status: p.status,
-          district: p.district,
-          type: p.type,
-          title_zh: p.titleZh,
-          title_en: p.titleEn,
-          block: p.block,
-          floor: p.floor,
-          unit: p.unit,
-          price: p.price,
-          gross_area: p.grossArea,
-          saleable_area: p.saleableArea,
-          view: p.view,
-          layout: p.layout,
-          mgmt: p.mgmt,
-          contact_name: p.contactName,
-          contact_phone: p.contactPhone,
-          agent_licence: p.agentLicence,
-          notes: p.notes,
-          photos: p.photos
-        }).then();
+      if (!titleZh) {
+        alert(currentLang === 'zh' ? '請先輸入物業/屋苑名稱！' : 'Please enter a property name!');
+        document.getElementById('edit-titleZh').focus();
+        return;
       }
-    } catch (err) {
-      console.warn('Supabase sync background warning:', err);
-    }
-  }
-}
+
+      const localObj = {
+        id: editId || "",
+        ref: "",
+        status: document.getElementById('edit-status').value,
+        district: document.getElementById('edit-district').value,
+        type: document.getElementById('edit-type').value,
+        titleZh: titleZh,
+        titleEn: document.getElementById('edit-titleEn').value.trim() || titleZh,
+        block: document.getElementById('edit-block').value,
+        floor: document.getElementById('edit-floor').value,
+        unit: document.getElementById('edit-unit').value,
+        price: priceVal,
+        grossArea: parseInt(document.getElementById('edit-grossArea').value) || 0,
+        saleableArea: saleableVal,
+        view: document.getElementById('edit-view').value,
+        layout: document.getElementById('edit-layout').value,
+        mgmt: document.getElementById('edit-mgmt').value,
+        contactName: document.getElementById('edit-contactName').value,
+        contactPhone: document.getElementById('edit-contactPhone').value,
+        agentLicence: document.getElementById('edit-agentLicence').value,
+        notes: document.getElementById('edit-notes').value,
+        photos: photosList
+      };
+
+      if (editId) {
+        const existingIdx = properties.findIndex(p => p.id === editId);
+        if (existingIdx >= 0) {
+          localObj.ref = properties[existingIdx].ref;
+          localObj.id = properties[existingIdx].id;
+          properties[existingIdx] = localObj;
+        }
+      } else {
+        properties.push(localObj);
       }
+
+      // Re-sequence all references consecutively (SK-001, SK-002...)
+      reindexProperties();
+      savePropertiesToStorage();
 
       alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
       updateDashboardStats();
@@ -1290,6 +1244,39 @@ async function saveProperty(e) {
       populateEAADropdown();
       renderDealRecords();
       switchTab('index');
+
+      // Async background sync to Supabase (Non-blocking)
+      if (supabaseClient) {
+        try {
+          for (let p of properties) {
+            supabaseClient.from('properties').upsert({
+              id: p.id,
+              ref: p.ref,
+              status: p.status,
+              district: p.district,
+              type: p.type,
+              title_zh: p.titleZh,
+              title_en: p.titleEn,
+              block: p.block,
+              floor: p.floor,
+              unit: p.unit,
+              price: p.price,
+              gross_area: p.grossArea,
+              saleable_area: p.saleableArea,
+              view: p.view,
+              layout: p.layout,
+              mgmt: p.mgmt,
+              contact_name: p.contactName,
+              contact_phone: p.contactPhone,
+              agent_licence: p.agentLicence,
+              notes: p.notes,
+              photos: p.photos
+            }).then();
+          }
+        } catch (err) {
+          console.warn('Supabase sync warning:', err);
+        }
+      }
     }
 
     async function deleteProperty(id) {
@@ -1302,7 +1289,7 @@ async function saveProperty(e) {
           try {
             await supabaseClient.from('properties').delete().eq('id', id);
             for (let p of properties) {
-              await supabaseClient.from('properties').upsert({
+              supabaseClient.from('properties').upsert({
                 id: p.id,
                 ref: p.ref,
                 status: p.status,
@@ -1324,7 +1311,7 @@ async function saveProperty(e) {
                 agent_licence: p.agentLicence,
                 notes: p.notes,
                 photos: p.photos
-              });
+              }).then();
             }
           } catch (e) {
             console.warn('Supabase delete error:', e);
