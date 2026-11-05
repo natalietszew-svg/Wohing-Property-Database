@@ -168,6 +168,9 @@
               <option value="Tai Po Tsai">大埔仔 Tai Po Tsai</option>
               <option value="Marina Cove">匡湖居 Marina Cove</option>
               <option value="Pak Sha Wan">白沙灣 Pak Sha Wan</option>
+              <option value="Ho Chung">蠔涌 Ho Chung</option>
+              <option value="Tai Mong Tsai">大網仔 Tai Mong Tsai</option>
+              <option value="Hang Hau">坑口 Hang Hau</option>
             </select>
           </div>
           <div>
@@ -279,6 +282,9 @@
               <option value="Tai Po Tsai">大埔仔 Tai Po Tsai</option>
               <option value="Marina Cove">匡湖居 Marina Cove</option>
               <option value="Pak Sha Wan">白沙灣 Pak Sha Wan</option>
+              <option value="Ho Chung">蠔涌 Ho Chung</option>
+              <option value="Tai Mong Tsai">大網仔 Tai Mong Tsai</option>
+              <option value="Hang Hau">坑口 Hang Hau</option>
             </select>
           </div>
           <div>
@@ -291,6 +297,78 @@
               <option value="Parking Space" data-i18n="opt_park">車位</option>
             </select>
           </div>
+        </div>
+
+        <!-- COMPLETE SAI KUNG VILLAGES & ESTATES QUICK SELECTOR -->
+        <div class="p-3 bg-brand-50/60 border border-brand-200/80">
+          <label class="block text-xs font-bold text-brand-800 mb-1">快速選擇西貢著名村落或豪苑/屋苑 (Quick Select Village or Housing Estate):</label>
+          <select id="quick-estate-select" onchange="applyQuickEstate(this.value)" class="w-full text-xs md:text-sm border border-slate-200 p-2 bg-white outline-none">
+            <option value="">-- 請選擇西貢村落或屋苑 (Choose Sai Kung Village or Estate) --</option>
+            <optgroup label="🏢 著名豪宅及私人屋苑 (Major Housing & Estates)">
+              <option value="匡湖居 (Marina Cove)|Marina Cove|Marina Cove|Detached House">匡湖居 Marina Cove</option>
+              <option value="傲瀧 (Mount Pavilia)|Mount Pavilia|Pak Sha Wan|Flat">傲瀧 Mount Pavilia</option>
+              <option value="逸瓏海匯 (Park Mediterranean)|Park Mediterranean|Sai Kung Town|Flat">逸瓏海匯 Park Mediterranean</option>
+              <option value="逸瓏園 (The Mediterranean)|The Mediterranean|Sai Kung Town|Flat">逸瓏園 The Mediterranean</option>
+              <option value="133 意港 (133 Portofino)|133 Portofino|Sai Kung Town|Flat">133 意港 133 Portofino</option>
+              <option value="玥廬 (The Giverny)|The Giverny|Pak Sha Wan|Detached House">玥廬 The Giverny</option>
+              <option value="柏寧頓花園 (Burlingame Garden)|Burlingame Garden|Silverstrand|Flat">柏寧頓花園 Burlingame Garden</option>
+              <option value="慶徑石花園別墅 (Floral Villas)|Floral Villas|Ho Chung|Detached House">慶徑石花園別墅 Floral Villas</option>
+              <option value="曉嵐閣 (Sierra Sea)|Sierra Sea|Clear Water Bay|Flat">曉嵐閣 Sierra Sea</option>
+              <option value="帝琴灣 (Symphony Bay)|Symphony Bay|Tai Po Tsai|Flat">帝琴灣 Symphony Bay</option>
+              <option value="西貢花園 (Sai Kung Garden)|Sai Kung Garden|Sai Kung Town|Flat">西貢花園 Sai Kung Garden</option>
+              <option value="西貢大廈 (Sai Kung Building)|Sai Kung Building|Sai Kung Town|Flat">西貢大廈 Sai Kung Building</option>
+              <option value="松濤苑 (Las Pinadas)|Las Pinadas|Clear Water Bay|Detached House">松濤苑 Las Pinadas</option>
+              <option value="銀泉台 (Silver Fountain Terrace)|Silver Fountain Terrace|Silverstrand|Flat">銀泉台 Silver Fountain Terrace</option>
+              <option value="夏威夷花園 (Hawaii Garden)|Hawaii Garden|Silverstrand|Flat">夏威夷花園 Hawaii Garden</option>
+              <option value="對面海邨 (Tui Min Hoi Chuen)|Tui Min Hoi Chuen|Sai Kung Town|Flat">對面海邨 Tui Min Hoi Chuen</option>
+            </optgroup>
+            <optgroup label="🏘️ 西貢原居民村及鄉郊村落 (Indigenous & Country Villages)">
+              <option value="車徑篤 (Che Keng Tuk)|Che Keng Tuk|Sai Kung Town|Village House">車徑篤 Che Keng Tuk</option>
+              <option value="竹園 (Chuk Yuen)|Chuk Yuen|Sai Kung Town|Village House">竹園 Chuk Yuen</option>
+              <option value="下洋 (Ha Yeung)|Ha Yeung|Clear Water Bay|Village House">下洋 Ha Yeung</option>
+              <option value="鹹田 (Ham Tin)|Ham Tin|Tai Mong Tsai|Village House">鹹田 Ham Tin</option>
+              <option value="坑口村 (Hang Hau Village)|Hang Hau Village|Hang Hau|Village House">坑口村 Hang Hau Village</option>
+              <option value="慶徑石 (Hing Keng Shek)|Hing Keng Shek|Ho Chung|Village House">慶徑石 Hing Keng Shek</option>
+              <option value="蠔涌 (Ho Chung)|Ho Chung|Ho Chung|Village House">蠔涌 Ho Chung</option>
+              <option value="界咸 (Kai Ham)|Kai Ham|Ho Chung|Village House">界咸 Kai Ham</option>
+              <option value="滘西漁民村 (Kau Sai Chau)|Kau Sai Chau|Sai Kung Town|Village House">滘西漁民村 Kau Sai Chau</option>
+              <option value="浪徑 (Long Keng)|Long Keng|Tai Mong Tsai|Village House">浪徑 Long Keng</option>
+              <option value="鹿尾 (Luk Mei)|Luk Mei|Ho Chung|Village House">鹿尾 Luk Mei</option>
+              <option value="龍尾 (Lung Mei)|Lung Mei|Tai Mong Tsai|Village House">龍尾 Lung Mei</option>
+              <option value="麻南笏 (Ma Nam Wat)|Ma Nam Wat|Pak Sha Wan|Village House">麻南笏 Ma Nam Wat</option>
+              <option value="萬屋 (Man Wo)|Man Wo|Ho Chung|Village House">萬屋 Man Wo</option>
+              <option value="孟公屋 (Mang Kung Uk)|Mang Kung Uk|Clear Water Bay|Village House">孟公屋 Mang Kung Uk</option>
+              <option value="孟公窩 (Mang Kung Wo)|Mang Kung Wo|Ho Chung|Village House">孟公窩 Mang Kung Wo</option>
+              <option value="茅坪 (Mau Ping)|Mau Ping|Ho Chung|Village House">茅坪 Mau Ping</option>
+              <option value="茅湖仔 (Mau Wu Tsai)|Mau Wu Tsai|Hang Hau|Village House">茅湖仔 Mau Wu Tsai</option>
+              <option value="莫遮輋 (Mok Tse Che)|Mok Tse Che|Ho Chung|Village House">莫遮輋 Mok Tse Che</option>
+              <option value="梅窩 (西貢) (Mu Wo)|Mu Wo|Ho Chung|Village House">梅窩 (西貢) Mu Wo</option>
+              <option value="南山 (Nam Shan)|Nam Shan|Sai Kung Town|Village House">南山 Nam Shan</option>
+              <option value="南圍 (Nam Wai)|Nam Wai|Pak Sha Wan|Village House">南圍 Nam Wai</option>
+              <option value="五塊田 (Ng Fai Tin)|Ng Fai Tin|Clear Water Bay|Village House">五塊田 Ng Fai Tin</option>
+              <option value="澳頭 (O Tau)|O Tau|Ho Chung|Village House">澳頭 O Tau</option>
+              <option value="北港 (Pak Kong)|Pak Kong|Sai Kung Town|Village House">北港 Pak Kong</option>
+              <option value="北港坳 (Pak Kong Au)|Pak Kong Au|Sai Kung Town|Village House">北港坳 Pak Kong Au</option>
+              <option value="白沙灣村 (Pak Sha Wan Village)|Pak Sha Wan Village|Pak Sha Wan|Village House">白沙灣村 Pak Sha Wan Village</option>
+              <option value="壁屋 (Pik Uk)|Pik Uk|Clear Water Bay|Village House">壁屋 Pik Uk</option>
+              <option value="布袋澳 (Po Toi O)|Po Toi O|Clear Water Bay|Village House">布袋澳 Po Toi O</option>
+              <option value="沙下 (Sha Ha)|Sha Ha|Sai Kung Town|Village House">沙下 Sha Ha</option>
+              <option value="沙角尾 (Sha Kok Mei)|Sha Kok Mei|Sai Kung Town|Village House">沙角尾 Sha Kok Mei</option>
+              <option value="相思灣 (Sheung Sze Wan)|Sheung Sze Wan|Clear Water Bay|Village House">相思灣 Sheung Sze Wan</option>
+              <option value="上洋 (Sheung Yeung)|Sheung Yeung|Clear Water Bay|Village House">上洋 Sheung Yeung</option>
+              <option value="大坑口 (Tai Hang Hau)|Tai Hang Hau|Clear Water Bay|Village House">大坑口 Tai Hang Hau</option>
+              <option value="大藍湖 (Tai Lam Wu)|Tai Lam Wu|Ho Chung|Village House">大藍湖 Tai Lam Wu</option>
+              <option value="大浪 (Tai Long)|Tai Long|Tai Mong Tsai|Village House">大浪 Tai Long</option>
+              <option value="大網仔 (Tai Mong Tsai)|Tai Mong Tsai|Tai Mong Tsai|Village House">大網仔 Tai Mong Tsai</option>
+              <option value="大埔仔 (Tai Po Tsai)|Tai Po Tsai|Tai Po Tsai|Village House">大埔仔 Tai Po Tsai</option>
+              <option value="大灣 (Tai Wan)|Tai Wan|Sai Kung Town|Village House">大灣 Tai Wan</option>
+              <option value="井欄樹 (Tseng Lan Shue)|Tseng Lan Shue|Clear Water Bay|Village House">井欄樹 Tseng Lan Shue</option>
+              <option value="早禾坑 (Tso Wo Hang)|Tso Wo Hang|Tai Mong Tsai|Village House">早禾坑 Tso Wo Hang</option>
+              <option value="對面海 (Tui Min Hoi)|Tui Min Hoi|Sai Kung Town|Village House">對面海 Tui Min Hoi</option>
+              <option value="黃竹灣 (Wong Chuk Wan)|Wong Chuk Wan|Tai Mong Tsai|Village House">黃竹灣 Wong Chuk Wan</option>
+              <option value="黃麖地 (Wong Keng Tei)|Wong Keng Tei|Tai Mong Tsai|Village House">黃麖地 Wong Keng Tei</option>
+            </optgroup>
+          </select>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -386,21 +464,22 @@
           </div>
         </div>
 
+        <!-- PHOTO UPLOAD & MULTIMEDIA -->
         <div class="p-4 bg-brand-50/40 border border-brand-200/80 space-y-3">
           <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div>
               <h3 class="text-xs font-bold uppercase tracking-wide text-slate-700 flex items-center gap-2">
-                <i class="fa-solid fa-images text-brand-800"></i> <span data-i18n="sec_photos">相片與平面圖管理</span>
+                <i class="fa-solid fa-images text-brand-800"></i> <span data-i18n="sec_photos">相片與平面圖管理 (實時持久儲存)</span>
               </h3>
             </div>
             <div class="flex gap-2 w-full sm:w-auto">
               <label class="cursor-pointer bg-slate-800 hover:bg-slate-900 text-white text-xs px-3.5 py-2 transition flex items-center gap-1.5">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
-                <span data-i18n="btn_upload">模擬上傳</span>
-                <input type="file" accept="image/*" multiple onchange="handleSimulatedUpload(event)" class="hidden"/>
+                <span data-i18n="btn_upload">上傳相片 Upload Photos</span>
+                <input type="file" accept="image/*" multiple onchange="handleFileUpload(event)" class="hidden"/>
               </label>
               <button type="button" onclick="addPhotoUrlPrompt()" class="cursor-pointer bg-brand-800 hover:bg-brand-900 text-white text-xs px-3.5 py-2 transition flex items-center gap-1.5">
-                <i class="fa-solid fa-link"></i> <span data-i18n="btn_url">網址</span>
+                <i class="fa-solid fa-link"></i> <span data-i18n="btn_url">相片網址 Add URL</span>
               </button>
             </div>
           </div>
@@ -582,7 +661,7 @@
       console.warn('Supabase init failed, running local offline mode.', e);
     }
 
-    let currentLang = 'zh'; // 'zh' or 'en'
+    let currentLang = 'zh';
 
     const i18n = {
       zh: {
@@ -654,9 +733,9 @@
         f_cphone: "電話號碼",
         f_agent_licence: "經辦營業員牌照號碼",
         f_cnotes: "備註 / 放盤細節",
-        sec_photos: "相片與平面圖管理",
-        btn_upload: "模擬上傳",
-        btn_url: "網址",
+        sec_photos: "相片與平面圖管理 (實時持久儲存)",
+        btn_upload: "上傳相片 Upload Photos",
+        btn_url: "相片網址 Add URL",
         eaa_select: "選擇樓盤:",
         btn_print: "列印",
         deal_title: "成交記錄冊",
@@ -748,8 +827,8 @@
         f_cphone: "Phone Number",
         f_agent_licence: "Salesperson Licence No.",
         f_cnotes: "Private Notes",
-        sec_photos: "Photo Gallery & Floorplans",
-        btn_upload: "Simulate Upload",
+        sec_photos: "Photo Gallery & Floorplans (Persistent)",
+        btn_upload: "Upload Photos",
         btn_url: "Add URL",
         eaa_select: "Select Listing:",
         btn_print: "Print",
@@ -831,8 +910,7 @@
     };
 
     function loadPropertiesData() {
-      // Load local storage first for immediate rendering
-      const localData = localStorage.getItem('wo_hing_properties_v4');
+      const localData = localStorage.getItem('wo_hing_properties_v6');
       if (localData) {
         try {
           properties = JSON.parse(localData);
@@ -841,7 +919,6 @@
         }
       }
 
-      // Sync across all devices from Supabase live DB
       if (supabaseClient) {
         supabaseClient.from('properties').select('*').then(({ data, error }) => {
           if (!error && data && data.length > 0) {
@@ -884,7 +961,20 @@
     }
 
     function savePropertiesToStorage() {
-      localStorage.setItem('wo_hing_properties_v4', JSON.stringify(properties));
+      localStorage.setItem('wo_hing_properties_v6', JSON.stringify(properties));
+    }
+
+    function applyQuickEstate(val) {
+      if (!val) return;
+      const parts = val.split('|');
+      if (parts.length >= 3) {
+        document.getElementById('edit-titleZh').value = parts[0];
+        document.getElementById('edit-titleEn').value = parts[1];
+        document.getElementById('edit-district').value = parts[2];
+        if (parts[3]) {
+          document.getElementById('edit-type').value = parts[3];
+        }
+      }
     }
 
     function switchTab(tabName) {
@@ -926,7 +1016,6 @@
       document.getElementById('stat-avgprice').innerText = '$' + avgPrice.toLocaleString();
     }
 
-    // FORMAT PRICE: 萬 FOR SELLING, 千 FOR RENTING
     function formatPriceDisplay(p) {
       if (p.status === 'Rent' || p.status === 'Rented') {
         let thousandVal = p.price >= 1000 ? (p.price / 1000) : p.price;
@@ -934,8 +1023,7 @@
           ? `$${thousandVal.toLocaleString()}千/月`
           : `$${thousandVal.toLocaleString()}k/mo`;
       } else {
-        // Selling
-        let wanVal = p.price > 1000 ? (p.price / 10000) : (p.price * 100); // 33.8M = 3380萬
+        let wanVal = p.price > 1000 ? (p.price / 10000) : (p.price * 100);
         return currentLang === 'zh'
           ? `${wanVal.toLocaleString()}萬`
           : `$${p.price.toLocaleString()}M`;
@@ -1141,7 +1229,6 @@
         photos: propertyPayload.photos
       };
 
-      // 1. Update in-memory local state
       const existingIdx = properties.findIndex(p => p.id === id);
       if (existingIdx >= 0) {
         properties[existingIdx] = localObj;
@@ -1149,10 +1236,8 @@
         properties.unshift(localObj);
       }
 
-      // 2. Save to local storage cache
       savePropertiesToStorage();
 
-      // 3. Save to live Supabase DB for all devices
       if (supabaseClient) {
         try {
           await supabaseClient.from('properties').upsert(propertyPayload);
@@ -1161,7 +1246,7 @@
         }
       }
 
-      alert(currentLang === 'zh' ? '樓盤資料已成功儲存！' : 'Property saved successfully!');
+      alert(currentLang === 'zh' ? '樓盤資料及相片已成功儲存！' : 'Property & photos saved successfully!');
       updateDashboardStats();
       renderListings();
       populateEAADropdown();
@@ -1216,15 +1301,25 @@
       }
     }
 
-    function handleSimulatedUpload(event) {
+    function handleFileUpload(event) {
       const files = event.target.files;
       if (!files || files.length === 0) return;
+
       const photoElements = document.querySelectorAll('.grid-photo-url');
       const currentList = Array.from(photoElements).map(el => el.value);
-      for (let file of files) {
-        currentList.push(URL.createObjectURL(file));
+
+      let readCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          currentList.push(e.target.result);
+          readCount++;
+          if (readCount === files.length) {
+            renderPhotoGrid(currentList);
+          }
+        };
+        reader.readAsDataURL(files[i]);
       }
-      renderPhotoGrid(currentList);
     }
 
     function removePhotoFromGrid(btnElement) {
