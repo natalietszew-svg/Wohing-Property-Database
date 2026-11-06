@@ -669,7 +669,7 @@
         btn_new: "新增樓盤"
       },
       en: {
-        sys_title: "Wo Hing Property Management",
+        sys_title: "Wo Hing Property Agency",
         nav_index: "Listing Index",
         nav_edit: "Details & Photos",
         nav_eaa: "EAA Forms",
@@ -1058,49 +1058,49 @@
       reindexProperties();
       savePropertiesToStorage();
 
-      // Sync to Supabase Cloud DB with error reporting
+  // Sync single property to Supabase Cloud DB securely
       if (supabaseClient) {
         try {
-          const payload = properties.map(p => ({
-            id: String(p.id),
-            ref: String(p.ref),
-            status: p.status,
-            district: p.district,
-            type: p.type,
-            title_zh: p.titleZh,
-            title_en: p.titleEn,
-            block: p.block,
-            floor: p.floor,
-            unit: p.unit,
-            price: p.price,
-            price_unit: p.priceUnit,
-            gross_area: p.grossArea,
-            saleable_area: p.saleableArea,
-            view: p.view,
-            layout: p.layout,
-            mgmt: p.mgmt,
-            contact_name: p.contactName,
-            contact_phone: p.contactPhone,
-            agent_licence: p.agentLicence,
-            notes: p.notes,
-            photos: p.photos,
-            updated_at: p.updatedAt
-          }));
+          const singlePayload = {
+            id: String(propertyData.id),
+            ref: String(propertyData.ref),
+            status: propertyData.status,
+            district: propertyData.district,
+            type: propertyData.type,
+            title_zh: propertyData.titleZh,
+            title_en: propertyData.titleEn,
+            block: propertyData.block,
+            floor: propertyData.floor,
+            unit: propertyData.unit,
+            price: propertyData.price,
+            price_unit: propertyData.priceUnit,
+            gross_area: propertyData.grossArea,
+            saleable_area: propertyData.saleableArea,
+            view: propertyData.view,
+            layout: propertyData.layout,
+            mgmt: propertyData.mgmt,
+            contact_name: propertyData.contactName,
+            contact_phone: propertyData.contactPhone,
+            agent_licence: propertyData.agentLicence,
+            notes: propertyData.notes,
+            photos: propertyData.photos,
+            updated_at: propertyData.updatedAt
+          };
 
-          const { error: dbError } = await supabaseClient.from('properties').upsert(payload);
+          const { error: dbError } = await supabaseClient.from('properties').upsert(singlePayload);
           if (dbError) {
-            console.error('Supabase Save Error:', dbError);
-            alert('【雲端儲存失敗】 Supabase Error: ' + dbError.message);
+            console.error('Save Error:', dbError);
+            alert('【雲端儲存失敗】Error: ' + dbError.message);
             return;
           }
         } catch (dbErr) {
           console.error('Supabase exception:', dbErr);
-          alert('【網絡連接失敗】 Unable to connect to Supabase database.');
+          alert('【網絡連接失敗】 Unable to connect to database.');
           return;
         }
       }
 
-      alert('【成功儲存】樓盤資料已成功同步至 Supabase 雲端！');
+      alert('【成功儲存】樓盤資料已成功同步至雲端');
       updateDashboardStats();
       renderListings();
       populateEAADropdown();
@@ -1120,7 +1120,7 @@
           } catch (e) {}
         }
 
-        alert('樓盤已成功刪除！');
+        alert('樓盤已成功刪除');
         updateDashboardStats();
         renderListings();
         populateEAADropdown();
