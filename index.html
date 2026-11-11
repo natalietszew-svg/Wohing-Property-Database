@@ -1285,3 +1285,31 @@
   </script>
 </body>
 </html>
+
+async function uploadPropertyPhotos(propertyRef, files) {
+  if (!files || files.length === 0) return [];
+  
+  let uploadedUrls = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+    
+    // Creates a virtual folder structure inside your bucket: SK-001/filename.jpg
+    const filePath = `${propertyRef}/${fileName}`;
+
+    const { data, error } = await supabaseClient.storage
+      .from('property-photos')
+      .upload(filePath, file, { upsert: true });
+
+    if (!error) {
+      const { data: publicURLData } = supabaseClient.storage
+        .from('property-photos')
+        .getPublicUrl(filePath);
+      
+      if (publicURLData) uploadedUrls.push(publicURLData.publicUrl);
+    }
+  }
+  return uploadedUrls;
+}
