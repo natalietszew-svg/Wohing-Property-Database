@@ -1058,7 +1058,7 @@
       reindexProperties();
       savePropertiesToStorage();
 
-  // Sync single property to Supabase Cloud DB securely
+      // Sync single property to Supabase Cloud DB securely
       if (supabaseClient) {
         try {
           const singlePayload = {
@@ -1110,14 +1110,19 @@
 
     async function deleteProperty(id) {
       if (confirm('確定要刪除此樓盤資料嗎？刪除後編號將自動重新順序排列。')) {
-        properties = properties.filter(p => p.id !== id && p.ref !== id);
+        const target = properties.find(p => p.id === id || p.ref === id);
+        const targetRef = target ? target.ref : id;
+
+        properties = properties.filter(p => p.id !== id && p.ref !== id && p.ref !== targetRef);
         reindexProperties();
         savePropertiesToStorage();
 
         if (supabaseClient) {
           try {
-            await supabaseClient.from('properties').delete().eq('id', id);
-          } catch (e) {}
+            await supabaseClient.from('properties').delete().eq('ref', targetRef);
+          } catch (e) {
+            console.error('Delete exception:', e);
+          }
         }
 
         alert('樓盤已成功刪除');
@@ -1128,28 +1133,58 @@
       }
     }
 
- async function handleCloudUpload(event) {
-  const files = event.target.files;
-  if (!files || files.length === 0) return;
-  if (!supabaseClient) {
-    alert('Supabase client not connected for cloud storage.');
-    return;
-  }
+    // Properly integrated uploadPropertyPhotos function inside script scope
+    async function uploadPropertyPhotos(propertyRef, files) {
+      if (!files || files.length === 0) return [];
+      
+      let uploadedUrls = [];
 
-  // Get the current property reference SKU from the form
-  const propertyRef = document.getElementById('edit-ref').value || 'general';
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+        const filePath = `${propertyRef}/${fileName}`;
 
-  // Upload files into the specific property folder
-  const newPhotoUrls = await uploadPropertyPhotos(propertyRef, files);
+        const { data, error } = await supabaseClient.storage
+          .from('property-photos')
+          .upload(filePath, file, { upsert: true });
 
-  // Combine with any existing photos
-  const photoEls = document.querySelectorAll('.grid-photo-url');
-  const currentPhotos = Array.from(photoEls).map(el => el.value);
-  const combinedPhotos = [...currentPhotos, ...newPhotoUrls];
+        if (!error) {
+          const { data: publicURLData } = supabaseClient.storage
+            .from('property-photos')
+            .getPublicUrl(filePath);
+          
+          if (publicURLData) uploadedUrls.push(publicURLData.publicUrl);
+        }
+      }
+      return uploadedUrls;
+    }
 
-  renderPhotoGrid(combinedPhotos);
-  alert('相片已成功上傳至專屬資料夾並同步至雲端！');
-}
+    async function handleCloudUpload(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      if (!supabaseClient) {
+        alert('Supabase client not connected for cloud storage.');
+        return;
+      }
+
+      const propertyRef = document.getElementById('edit-ref').value || 'general';
+      const newPhotoUrls = await uploadPropertyPhotos(propertyRef, files);
+
+      const photoEls = document.querySelectorAll('.grid-photo-url');
+      const currentPhotos = Array.from(photoEls).map(el => el.value);
+      
+      // Deduplicate to prevent multiple duplicate versions
+      const combinedPhotos = Array.from(new Set([...currentPhotos, ...newPhotoUrls]));
+
+      renderPhotoGrid(combinedPhotos);
+
+      // Reset file input so selecting the same file works again
+      event.target.value = '';
+
+      alert('相片已成功上傳至專屬資料夾並同步至雲端！');
+    }
+
     function renderPhotoGrid(photoUrls) {
       const container = document.getElementById('photo-grid');
       container.innerHTML = '';
@@ -1268,31 +1303,3 @@
   </script>
 </body>
 </html>
-
-async function uploadPropertyPhotos(propertyRef, files) {
-  if (!files || files.length === 0) return [];
-  
-  let uploadedUrls = [];
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-    
-    // Creates a virtual folder structure inside your bucket: SK-001/filename.jpg
-    const filePath = `${propertyRef}/${fileName}`;
-
-    const { data, error } = await supabaseClient.storage
-      .from('property-photos')
-      .upload(filePath, file, { upsert: true });
-
-    if (!error) {
-      const { data: publicURLData } = supabaseClient.storage
-        .from('property-photos')
-        .getPublicUrl(filePath);
-      
-      if (publicURLData) uploadedUrls.push(publicURLData.publicUrl);
-    }
-  }
-  return uploadedUrls;
-}
