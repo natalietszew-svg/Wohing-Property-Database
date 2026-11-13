@@ -1424,6 +1424,290 @@
       document.getElementById('res-monthly').innerText = '$57,480';
       document.getElementById('res-stampduty').innerText = '$675,000';
     }
+// ==========================================
+// 1. SKU GENERATOR (Prevents Duplicate/Colliding SKUs)
+// ==========================================
+function getNextSku() {
+  let maxNum = 0;
+  properties.forEach(p => {
+    const code = p.ref || p.id || '';
+    const match = code.match(/^SK-(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  });
+  const nextNum = maxNum + 1;
+  return `SK-${String(nextNum).padStart(3, '0')}`;
+}
+
+function sortPropertiesBySku() {
+  properties.sort((a, b) => {
+    const numA = parseInt((a.ref || a.id || '').replace(/\D/g, ''), 10) || 0;
+    const numB = parseInt((b.ref || b.id || '').replace(/\D/g, ''), 10) || 0;
+    return numA - numB;
+  });
+}
+
+// ==========================================
+// 2. TAB NAVIGATION (Prevents Uploading to Empty/Root SKU)
+// ==========================================
+function switchTab(tabName) {
+  // If user clicks "樓盤詳情與相片" directly while no SKU is loaded, auto-initialize a new SKU
+  if (tabName === 'edit' && !document.getElementById('edit-ref').value.trim()) {
+    createNewProperty();
+    return;
+  }
+  document.querySelectorAll('.view-panel').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.nav-btn').forEach(el => {
+    el.classList.remove('bg-brand-700', 'text-white', 'font-semibold');
+    el.classList.add('text-brand-100');
+  });
+  const targetView = document.getElementById(`view-${tabName}`);
+  if (targetView) targetView.classList.remove('hidden');
+
+  const activeNav = document.getElementById(`nav-${tabName}`);
+  if (activeNav) {
+    activeNav.classList.add('bg-brand-700', 'text-white', 'font-semibold');
+    activeNav.classList.remove('text-brand-100');
+  }
+  if (tabName === 'eaa' && typeof renderEAAForm === 'function') renderEAAForm();
+  if (tabName === 'deal' && typeof renderDealRecords === 'function') renderDealRecords();
+}
+
+// ==========================================
+// 3. SUPABASE STORAGE UPLOAD & DELETE (100% Synced with Bucket)
+// ==========================================
+async function uploadPropertyPhotos(propertyRef, files) {
+  if (!supabaseClient || !files || files.length === 0) return [];
+  const cleanRef = (propertyRef || getNextSku()).trim();
+  const uploadedUrls = [];
+
+  for (const file of files) {
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const safeFileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${ext}`;
+    const filePath = `${cleanRef}/${safeFileName}`;
+
+    const { error: uploadError } = await supabaseClient.storage
+      .from('property-photos')
+      .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+    if (uploadError) {
+      console.error('Upload error for', file.name, uploadError.message);
+      alert(`上傳相片失敗 (${file.name}): ${uploadError.message}`);
+      continue;
+    }
+
+    const { data: publicUrlData } = supabaseClient.storage
+      .from('property-photos')
+      .getPublicUrl(filePath);
+
+    if (publicUrlData && publicUrlData.publicUrl) {
+      uploadedUrls.push(publicUrlData.publicUrl);
+    }
+  }
+  return uploadedUrls;
+}
+
+async function deletePhotoFromSupabaseStorage(photoUrl) {
+  if (!supabaseClient || !photoUrl) return false;
+  try {
+    const bucketName = 'property-photos';
+    let filePath = '';
+    if (photoUrl.includes(`/${bucketName}/`)) {
+      filePath = decodeURIComponent(photoUrl.split(`/${bucketName}/`)[1].split('?')[0]);
+    } else {
+      filePath = decodeURIComponent(photoUrl.split('?')[0]);
+    }
+    filePath = filePath.replace(/^\/+/, '');
+    if (!filePath) return false;
+
+    const { error } = await supabaseClient.storage
+      .from(bucketName)
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Failed to delete file from Supabase storage:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Error deleting photo from storage:', err);
+    return false;
+  }
+}
+
+async function handleCloudUpload(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+  if (!supabaseClient) {
+    alert('Supabase client not connected for cloud storage.');
+    return;
+  }
+
+  let propertyRef = document.getElementById('edit-ref').value.trim();
+  if (!propertyRef) {
+    propertyRef = getNextSku();
+    document.getElementById('edit-ref').value = propertyRef;
+  }
+
+  // Wipe any leftover orphan files in this SKU folder if this is a brand-new property with 0 current photos
+  const existingProp = properties.find(p => p.ref === propertyRef || p.id === propertyRef);
+  const photoEls = document.querySelectorAll('.grid-photo-url');
+  const currentPhotos = Array.from(photoEls).map(el => el.value).filter(Boolean);
+
+  if (!existingProp && currentPhotos.length === 0) {
+    const { data: strayFiles } = await supabaseClient.storage.from('property-photos').list(propertyRef);
+    if (strayFiles && strayFiles.length > 0) {
+      const strayPaths = strayFiles.map(f => `${propertyRef}/${f.name}`);
+      await supabaseClient.storage.from('property-photos').remove(strayPaths);
+    }
+  }
+
+  const newPhotoUrls = await uploadPropertyPhotos(propertyRef, files);
+  const combinedPhotos = Array.from(new Set([...currentPhotos, ...newPhotoUrls]));
+  renderPhotoGrid(combinedPhotos);
+  event.target.value = '';
+
+  if (existingProp) {
+    existingProp.photos = combinedPhotos;
+    existingProp.updatedAt = new Date().toISOString();
+    savePropertiesToStorage();
+    await syncPropertyToSupabase(existingProp);
+    const titleTextEl = document.getElementById('form-title-text');
+    if (titleTextEl) {
+      titleTextEl.innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 編輯樓盤 : ${existingProp.ref} (${existingProp.titleZh || ''}) — 最後更新: ${formatDateTime(existingProp.updatedAt)}`;
+    }
+    renderListings();
+    alert('相片已成功上傳至專屬資料夾並同步至雲端！');
+  } else {
+    alert('相片已上傳至雲端！請填寫物業名稱並按「儲存資料 Save」以完成新增樓盤。');
+  }
+}
+
+// ==========================================
+// 4. DELETE SINGLE PHOTO & DELETE PROPERTY (Wipes Bucket Folder + Row)
+// ==========================================
+async function removePhotoFromGrid(urlToRemove) {
+  if (!confirm('確定要刪除此相片嗎？雲端儲存空間內的檔案亦會同步刪除。')) return;
+
+  // 1. Delete from Supabase Storage bucket
+  await deletePhotoFromSupabaseStorage(urlToRemove);
+
+  // 2. Remove from UI photo grid
+  const photoEls = document.querySelectorAll('.grid-photo-url');
+  const remainingPhotos = Array.from(photoEls)
+    .map(el => el.value)
+    .filter(url => url && url !== urlToRemove);
+  renderPhotoGrid(remainingPhotos);
+
+  // 3. Immediately update database row if property already exists
+  const propertyRef = document.getElementById('edit-ref').value.trim();
+  const existingProp = properties.find(p => p.ref === propertyRef || p.id === propertyRef);
+  if (existingProp) {
+    existingProp.photos = remainingPhotos;
+    existingProp.updatedAt = new Date().toISOString();
+    savePropertiesToStorage();
+    await syncPropertyToSupabase(existingProp);
+    renderListings();
+  }
+}
+
+async function deleteProperty(refOrId) {
+  if (!confirm('確定要刪除此樓盤資料嗎？相關雲端相片資料夾亦會一併刪除。')) return;
+
+  const target = properties.find(p => p.ref === refOrId || p.id === refOrId);
+  const targetRef = (target ? target.ref : refOrId).trim();
+  const targetId = (target ? target.id : refOrId).trim();
+
+  // 1. Delete all photo URLs listed on the property
+  if (target && Array.isArray(target.photos) && target.photos.length > 0) {
+    for (const url of target.photos) {
+      await deletePhotoFromSupabaseStorage(url);
+    }
+  }
+
+  // 2. Also list and delete every file inside the `${targetRef}/` bucket folder so zero orphans remain
+  if (supabaseClient && targetRef) {
+    const { data: folderFiles } = await supabaseClient.storage
+      .from('property-photos')
+      .list(targetRef);
+    if (folderFiles && folderFiles.length > 0) {
+      const pathsToRemove = folderFiles
+        .filter(f => f.name && f.name !== '.emptyFolderPlaceholder')
+        .map(f => `${targetRef}/${f.name}`);
+      if (pathsToRemove.length > 0) {
+        await supabaseClient.storage.from('property-photos').remove(pathsToRemove);
+      }
+    }
+  }
+
+  // 3. Remove from local state & localStorage
+  properties = properties.filter(p => p.id !== targetId && p.ref !== targetRef);
+  sortPropertiesBySku();
+  savePropertiesToStorage();
+
+  // 4. Delete from Supabase public.properties table
+  if (supabaseClient) {
+    try {
+      const { error: delError } = await supabaseClient
+        .from('properties')
+        .delete()
+        .or(`id.eq.${targetId},ref.eq.${targetRef}`);
+      if (delError) {
+        alert('【雲端刪除失敗】Error: ' + delError.message);
+        return;
+      }
+    } catch (e) {
+      console.error('Delete exception:', e);
+    }
+  }
+
+  alert('樓盤及雲端相片資料夾已完全刪除！');
+  updateDashboardStats();
+  renderListings();
+  populateEAADropdown();
+  renderDealRecords();
+}
+
+// ==========================================
+// 5. SYNC TO SUPABASE (Always Locks id === ref so Duplicates Can Never Form)
+// ==========================================
+async function syncPropertyToSupabase(prop) {
+  if (!supabaseClient || !prop) return;
+  const stableSku = (prop.ref || prop.id || getNextSku()).trim();
+  prop.id = stableSku;
+  prop.ref = stableSku;
+
+  const singlePayload = {
+    id: stableSku,
+    ref: stableSku,
+    title_zh: prop.titleZh || '',
+    title_en: prop.titleEn || '',
+    district: prop.district || '',
+    type: prop.type || '',
+    status: prop.status || 'Sale',
+    price: Number(prop.price) || 0,
+    saleable_area: Number(prop.saleableArea) || 0,
+    gross_area: Number(prop.grossArea) || 0,
+    direction: prop.direction || '',
+    owner_name: prop.ownerName || '',
+    owner_phone: prop.ownerPhone || '',
+    car_park: prop.carPark || '',
+    notes: prop.notes || '',
+    photos: Array.isArray(prop.photos) ? Array.from(new Set(prop.photos)) : [],
+    updated_at: prop.updatedAt || new Date().toISOString()
+  };
+
+  const { error } = await supabaseClient
+    .from('properties')
+    .upsert(singlePayload, { onConflict: 'id' });
+
+  if (error) {
+    console.error('Supabase sync error:', error.message);
+    alert('【雲端同步失敗】Error: ' + error.message);
+  }
+}
   </script>
 </body>
 </html>
