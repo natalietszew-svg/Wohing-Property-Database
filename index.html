@@ -213,7 +213,7 @@
                 <th class="p-3.5" data-i18n="th_price">叫價 / 租金</th>
                 <th class="p-3.5" data-i18n="th_sqft">實用呎價</th>
                 <th class="p-3.5 text-center" data-i18n="th_photos">相片</th>
-                <th class="p-3.5" data-i18n="th_updated">更新日期</th>
+                <th class="p-3.5" data-i18n="th_updated">最後更新時間</th>
                 <th class="p-3.5 text-center" data-i18n="th_actions">操作</th>
               </tr>
             </thead>
@@ -251,7 +251,7 @@
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1.5">樓盤編號 SKU (自動順序)</label>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">樓盤編號 SKU (自動固定)</label>
             <input type="text" id="edit-ref" class="w-full text-sm border border-slate-300 p-2.5 bg-slate-100 font-bold text-brand-800 outline-none" readonly/>
           </div>
           <div>
@@ -610,7 +610,6 @@
 
   <!-- CORE ENGINE SCRIPT -->
   <script>
-    // SUPABASE REST API CONFIGURATION
     const SUPABASE_URL = 'https://ndojbpbkxysncodjfnwu.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_jVBNce5laZHb_DYcvcE4lg_giGTTHxq';
     
@@ -664,7 +663,7 @@
         th_price: "叫價 / 租金",
         th_sqft: "實用呎價",
         th_photos: "相片",
-        th_updated: "更新日期",
+        th_updated: "最後更新時間",
         th_actions: "操作",
         btn_new: "新增樓盤"
       },
@@ -704,11 +703,45 @@
         th_price: "Asking Price",
         th_sqft: "$ / Sq.ft",
         th_photos: "Photos",
-        th_updated: "Updated Date",
+        th_updated: "Last Updated",
         th_actions: "Actions",
         btn_new: "New Listing"
       }
     };
+
+    // Helper: Format timestamp with both Date AND Time (HKT)
+    function formatDateTime(isoString) {
+      if (!isoString) return '--';
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '--';
+      return d.toLocaleString('zh-HK', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+    }
+
+    // Helper: Sort properties cleanly by SKU number (SK-001, SK-002...) without overwriting existing IDs
+    function sortPropertiesBySku() {
+      properties.sort((a, b) => {
+        const numA = parseInt(String(a.ref || '').replace(/\D/g, ''), 10) || 0;
+        const numB = parseInt(String(b.ref || '').replace(/\D/g, ''), 10) || 0;
+        return numA - numB;
+      });
+    }
+
+    // Helper: Generate the next available SKU (e.g. SK-004) without mutating existing rows
+    function getNextSku() {
+      let maxNum = 0;
+      properties.forEach(p => {
+        const num = parseInt(String(p.ref || '').replace(/\D/g, ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      });
+      return `SK-${String(maxNum + 1).padStart(3, '0')}`;
+    }
 
     function setLanguage(lang) {
       currentLang = lang;
@@ -741,53 +774,53 @@
 
     async function loadPropertiesData() {
       if (supabaseClient) {
-        const { data, error } = await supabaseClient.from('properties').select('*');
-        if (!error && data && data.length > 0) {
-          properties = data.map(p => ({
-            id: p.id,
-            ref: p.ref,
-            status: p.status,
-            district: p.district,
-            type: p.type,
-            titleZh: p.title_zh,
-            titleEn: p.title_en,
-            block: p.block,
-            floor: p.floor,
-            unit: p.unit,
-            price: parseFloat(p.price),
-            priceUnit: p.price_unit || 'WAN',
-            grossArea: p.gross_area,
-            saleableArea: p.saleable_area,
-            view: p.view,
-            layout: p.layout,
-            mgmt: p.mgmt,
-            contactName: p.contact_name,
-            contactPhone: p.contact_phone,
-            agentLicence: p.agent_licence,
-            notes: p.notes,
-            photos: p.photos || [],
-            updatedAt: p.updated_at || new Date().toISOString()
-          }));
+        // Order by ref ascending so database updates never scramble the timeline
+        const { data, error } = await supabaseClient
+          .from('properties')
+          .select('*')
+          .order('ref', { ascending: true });
+
+        if (!error && data) {
+          // Deduplicate by ref in case older database rows had duplicate SKUs
+          const uniqueMap = new Map();
+          data.forEach(p => {
+            const stableRef = p.ref || p.id;
+            uniqueMap.set(stableRef, {
+              id: p.id || stableRef,
+              ref: stableRef,
+              status: p.status,
+              district: p.district,
+              type: p.type,
+              titleZh: p.title_zh,
+              titleEn: p.title_en,
+              block: p.block,
+              floor: p.floor,
+              unit: p.unit,
+              price: parseFloat(p.price) || 0,
+              priceUnit: p.price_unit || 'WAN',
+              grossArea: p.gross_area,
+              saleableArea: p.saleable_area,
+              view: p.view,
+              layout: p.layout,
+              mgmt: p.mgmt,
+              contactName: p.contact_name,
+              contactPhone: p.contact_phone,
+              agentLicence: p.agent_licence,
+              notes: p.notes,
+              photos: Array.isArray(p.photos) ? Array.from(new Set(p.photos)) : [],
+              updatedAt: p.updated_at || null
+            });
+          });
+          properties = Array.from(uniqueMap.values());
         }
       }
 
-      if ((!properties || properties.length === 0) && localStorage.getItem('wo_hing_properties_v9')) {
-        try { properties = JSON.parse(localStorage.getItem('wo_hing_properties_v9')); } catch (e) {}
-      }
-
-      reindexProperties();
+      sortPropertiesBySku();
+      savePropertiesToStorage();
       updateDashboardStats();
       renderListings();
       populateEAADropdown();
       renderDealRecords();
-    }
-
-    function reindexProperties() {
-      properties.forEach((p, index) => {
-        const seq = String(index + 1).padStart(3, '0');
-        p.ref = `SK-${seq}`;
-        p.id = p.ref;
-      });
     }
 
     function savePropertiesToStorage() {
@@ -902,7 +935,7 @@
         else if (p.status === 'Sold') statusClass = "bg-blue-50 text-blue-800 border border-blue-200";
         else if (p.status === 'Rented') statusClass = "bg-purple-50 text-purple-800 border border-purple-200";
 
-        let formattedDate = p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : '--';
+        let formattedDate = formatDateTime(p.updatedAt);
 
         let tr = document.createElement('tr');
         tr.className = 'hover:bg-brand-50/30 transition border-b border-slate-200';
@@ -926,9 +959,9 @@
           <td class="p-3.5 text-xs text-slate-600 font-medium">${formattedDate}</td>
           <td class="p-3.5 text-center">
             <div class="flex items-center justify-center gap-2">
-              <button type="button" onclick="editProperty('${p.id}')" title="Edit" class="cursor-pointer text-slate-600 hover:text-brand-800 p-1 text-sm"><i class="fa-solid fa-pen-to-square"></i></button>
-              <button type="button" onclick="selectForEAA('${p.id}')" title="EAA Forms" class="cursor-pointer text-brand-700 hover:text-brand-900 p-1 text-sm"><i class="fa-solid fa-file-contract"></i></button>
-              <button type="button" onclick="deleteProperty('${p.id}')" title="Delete" class="cursor-pointer text-red-500 hover:text-red-700 p-1 text-sm"><i class="fa-solid fa-trash-can"></i></button>
+              <button type="button" onclick="editProperty('${p.ref}')" title="Edit" class="cursor-pointer text-slate-600 hover:text-brand-800 p-1 text-sm"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button type="button" onclick="selectForEAA('${p.ref}')" title="EAA Forms" class="cursor-pointer text-brand-700 hover:text-brand-900 p-1 text-sm"><i class="fa-solid fa-file-contract"></i></button>
+              <button type="button" onclick="deleteProperty('${p.ref}')" title="Delete" class="cursor-pointer text-red-500 hover:text-red-700 p-1 text-sm"><i class="fa-solid fa-trash-can"></i></button>
             </div>
           </td>
         `;
@@ -960,21 +993,21 @@
 
     function createNewProperty() {
       document.getElementById('property-form').reset();
-      const nextSeq = String(properties.length + 1).padStart(3, '0');
+      const nextSku = getNextSku();
       document.getElementById('edit-id').value = '';
-      document.getElementById('edit-ref').value = `SK-${nextSeq}`;
-      document.getElementById('form-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 新增樓盤資料 (New Listing)`;
+      document.getElementById('edit-ref').value = nextSku;
+      document.getElementById('form-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 新增樓盤資料 (${nextSku})`;
       renderPhotoGrid([]);
       togglePriceUnitOption();
       switchTab('edit');
     }
 
-    function editProperty(id) {
-      const p = properties.find(item => item.id === id || item.ref === id);
+    function editProperty(refOrId) {
+      const p = properties.find(item => item.ref === refOrId || item.id === refOrId);
       if (!p) return;
 
-      document.getElementById('edit-id').value = p.id || p.ref;
-      document.getElementById('edit-ref').value = p.ref || '';
+      document.getElementById('edit-id').value = p.id;
+      document.getElementById('edit-ref').value = p.ref;
       document.getElementById('edit-status').value = p.status || 'Sale';
       document.getElementById('edit-district').value = p.district || 'Sai Kung Town';
       document.getElementById('edit-type').value = p.type || 'Flat';
@@ -995,16 +1028,54 @@
       document.getElementById('edit-agentLicence').value = p.agentLicence || '';
       document.getElementById('edit-notes').value = p.notes || '';
 
-      document.getElementById('form-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 編輯樓盤 : ${p.ref} (${p.titleZh})`;
+      document.getElementById('form-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 編輯樓盤 : ${p.ref} (${p.titleZh}) — 最後更新: ${formatDateTime(p.updatedAt)}`;
       calculateRates();
       renderPhotoGrid(p.photos || []);
       switchTab('edit');
+    }
+
+    // Syncs a single property object to Supabase without creating duplicates
+    async function syncPropertyToSupabase(propertyData) {
+      if (!supabaseClient) return null;
+
+      const singlePayload = {
+        id: String(propertyData.id),
+        ref: String(propertyData.ref),
+        status: propertyData.status,
+        district: propertyData.district,
+        type: propertyData.type,
+        title_zh: propertyData.titleZh,
+        title_en: propertyData.titleEn,
+        block: propertyData.block,
+        floor: propertyData.floor,
+        unit: propertyData.unit,
+        price: propertyData.price,
+        price_unit: propertyData.priceUnit,
+        gross_area: propertyData.grossArea,
+        saleable_area: propertyData.saleableArea,
+        view: propertyData.view,
+        layout: propertyData.layout,
+        mgmt: propertyData.mgmt,
+        contact_name: propertyData.contactName,
+        contact_phone: propertyData.contactPhone,
+        agent_licence: propertyData.agentLicence,
+        notes: propertyData.notes,
+        photos: propertyData.photos,
+        updated_at: propertyData.updatedAt
+      };
+
+      const { error } = await supabaseClient
+        .from('properties')
+        .upsert(singlePayload, { onConflict: 'id' });
+
+      return error;
     }
 
     async function saveProperty(e) {
       if (e) e.preventDefault();
 
       const editId = document.getElementById('edit-id').value.trim();
+      const currentRef = document.getElementById('edit-ref').value.trim() || getNextSku();
       const titleZh = document.getElementById('edit-titleZh').value.trim();
       
       if (!titleZh) {
@@ -1014,11 +1085,15 @@
       }
 
       const photoElements = document.querySelectorAll('.grid-photo-url');
-      const photosList = Array.from(photoElements).map(el => el.value);
+      const photosList = Array.from(new Set(Array.from(photoElements).map(el => el.value)));
+
+      const existingIdx = properties.findIndex(p => p.id === editId || p.ref === currentRef);
+      const stableId = existingIdx >= 0 ? properties[existingIdx].id : currentRef;
+      const stableRef = existingIdx >= 0 ? properties[existingIdx].ref : currentRef;
 
       const propertyData = {
-        id: editId || "",
-        ref: document.getElementById('edit-ref').value || "",
+        id: stableId,
+        ref: stableRef,
         status: document.getElementById('edit-status').value,
         district: document.getElementById('edit-district').value,
         type: document.getElementById('edit-type').value,
@@ -1042,52 +1117,21 @@
         updatedAt: new Date().toISOString()
       };
 
-      if (editId) {
-        const idx = properties.findIndex(p => p.id === editId || p.ref === editId);
-        if (idx >= 0) {
-          propertyData.ref = properties[idx].ref;
-          propertyData.id = properties[idx].id;
-          properties[idx] = propertyData;
-        } else {
-          properties.push(propertyData);
-        }
+      if (existingIdx >= 0) {
+        properties[existingIdx] = propertyData;
       } else {
         properties.push(propertyData);
       }
 
-      reindexProperties();
+      // Lock the form's hidden edit-id so subsequent photo edits know this listing already exists
+      document.getElementById('edit-id').value = propertyData.id;
+
+      sortPropertiesBySku();
       savePropertiesToStorage();
 
-      // Sync single property to Supabase Cloud DB securely
       if (supabaseClient) {
         try {
-          const singlePayload = {
-            id: String(propertyData.id),
-            ref: String(propertyData.ref),
-            status: propertyData.status,
-            district: propertyData.district,
-            type: propertyData.type,
-            title_zh: propertyData.titleZh,
-            title_en: propertyData.titleEn,
-            block: propertyData.block,
-            floor: propertyData.floor,
-            unit: propertyData.unit,
-            price: propertyData.price,
-            price_unit: propertyData.priceUnit,
-            gross_area: propertyData.grossArea,
-            saleable_area: propertyData.saleableArea,
-            view: propertyData.view,
-            layout: propertyData.layout,
-            mgmt: propertyData.mgmt,
-            contact_name: propertyData.contactName,
-            contact_phone: propertyData.contactPhone,
-            agent_licence: propertyData.agentLicence,
-            notes: propertyData.notes,
-            photos: propertyData.photos,
-            updated_at: propertyData.updatedAt
-          };
-
-          const { error: dbError } = await supabaseClient.from('properties').upsert(singlePayload);
+          const dbError = await syncPropertyToSupabase(propertyData);
           if (dbError) {
             console.error('Save Error:', dbError);
             alert('【雲端儲存失敗】Error: ' + dbError.message);
@@ -1108,24 +1152,41 @@
       switchTab('index');
     }
 
-    async function deleteProperty(id) {
-      if (confirm('確定要刪除此樓盤資料嗎？刪除後編號將自動重新順序排列。')) {
-        const target = properties.find(p => p.id === id || p.ref === id);
-        const targetRef = target ? target.ref : id;
+    async function deleteProperty(refOrId) {
+      if (confirm('確定要刪除此樓盤資料嗎？相關雲端相片亦會一併刪除。')) {
+        const target = properties.find(p => p.ref === refOrId || p.id === refOrId);
+        const targetRef = target ? target.ref : refOrId;
+        const targetId = target ? target.id : refOrId;
 
-        properties = properties.filter(p => p.id !== id && p.ref !== id && p.ref !== targetRef);
-        reindexProperties();
+        // Also delete all photos belonging to this property from Supabase Storage
+        if (target && Array.isArray(target.photos) && target.photos.length > 0) {
+          for (const url of target.photos) {
+            await deletePhotoFromSupabaseStorage(url);
+          }
+        }
+
+        properties = properties.filter(p => p.id !== targetId && p.ref !== targetRef);
+        sortPropertiesBySku();
         savePropertiesToStorage();
 
         if (supabaseClient) {
           try {
-            await supabaseClient.from('properties').delete().eq('ref', targetRef);
+            const { error: delError } = await supabaseClient
+              .from('properties')
+              .delete()
+              .or(`id.eq.${targetId},ref.eq.${targetRef}`);
+
+            if (delError) {
+              console.error('Delete error:', delError);
+              alert('【雲端刪除失敗】Error: ' + delError.message);
+              return;
+            }
           } catch (e) {
             console.error('Delete exception:', e);
           }
         }
 
-        alert('樓盤已成功刪除');
+        alert('樓盤及雲端相片已成功刪除');
         updateDashboardStats();
         renderListings();
         populateEAADropdown();
@@ -1133,7 +1194,6 @@
       }
     }
 
-    // Properly integrated uploadPropertyPhotos function inside script scope
     async function uploadPropertyPhotos(propertyRef, files) {
       if (!files || files.length === 0) return [];
       
@@ -1149,12 +1209,17 @@
           .from('property-photos')
           .upload(filePath, file, { upsert: true });
 
-        if (!error) {
-          const { data: publicURLData } = supabaseClient.storage
-            .from('property-photos')
-            .getPublicUrl(filePath);
-          
-          if (publicURLData) uploadedUrls.push(publicURLData.publicUrl);
+        if (error) {
+          alert('上傳失敗 Upload Failed: ' + error.message);
+          continue;
+        }
+
+        const { data: publicURLData } = supabaseClient.storage
+          .from('property-photos')
+          .getPublicUrl(filePath);
+        
+        if (publicURLData && publicURLData.publicUrl) {
+          uploadedUrls.push(publicURLData.publicUrl);
         }
       }
       return uploadedUrls;
@@ -1173,71 +1238,100 @@
 
       const photoEls = document.querySelectorAll('.grid-photo-url');
       const currentPhotos = Array.from(photoEls).map(el => el.value);
-      
-      // Deduplicate to prevent multiple duplicate versions
       const combinedPhotos = Array.from(new Set([...currentPhotos, ...newPhotoUrls]));
 
       renderPhotoGrid(combinedPhotos);
-
-      // Reset file input so selecting the same file works again
       event.target.value = '';
 
-      alert('相片已成功上傳至專屬資料夾並同步至雲端！');
+      // Immediately update timestamp and sync if editing an existing property
+      const existingProp = properties.find(p => p.ref === propertyRef);
+      if (existingProp) {
+        existingProp.photos = combinedPhotos;
+        existingProp.updatedAt = new Date().toISOString();
+        savePropertiesToStorage();
+        await syncPropertyToSupabase(existingProp);
+        document.getElementById('form-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 編輯樓盤 : ${existingProp.ref} (${existingProp.titleZh}) — 最後更新: ${formatDateTime(existingProp.updatedAt)}`;
+        renderListings();
+      }
+
+      alert('相片已成功上傳至專屬資料夾並同步更新時間！');
     }
+
     async function deletePhotoFromSupabaseStorage(photoUrl) {
-  if (!supabaseClient || !photoUrl) return;
-  
-  try {
-    const bucketName = 'property-photos';
-    const marker = `/public/${bucketName}/`;
-    const markerIndex = photoUrl.indexOf(marker);
-    
-    if (markerIndex === -1) return;
-    const filePath = decodeURIComponent(photoUrl.substring(markerIndex + marker.length));
+      if (!supabaseClient || !photoUrl) return false;
+      
+      try {
+        const bucketName = 'property-photos';
+        const marker = `/public/${bucketName}/`;
+        const markerIndex = photoUrl.indexOf(marker);
+        
+        if (markerIndex === -1) return false;
+        const filePath = decodeURIComponent(photoUrl.substring(markerIndex + marker.length).split('?')[0]);
 
-    const { error } = await supabaseClient.storage
-      .from(bucketName)
-      .remove([filePath]);
+        const { error } = await supabaseClient.storage
+          .from(bucketName)
+          .remove([filePath]);
 
-    if (error) {
-      console.error('Failed to delete file from Supabase storage:', error.message);
+        if (error) {
+          console.error('Failed to delete file from Supabase storage:', error.message);
+          alert('雲端相片刪除失敗: ' + error.message);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.error('Error deleting photo from storage:', err);
+        return false;
+      }
     }
-  } catch (err) {
-    console.error('Error deleting photo from storage:', err);
-  }
-}
 
-   function renderPhotoGrid(photoUrls) {
-  const container = document.getElementById('photo-grid');
-  container.innerHTML = '';
-  photoUrls.forEach((url, idx) => {
-    const div = document.createElement('div');
-    div.className = 'relative group border border-slate-300 rounded overflow-hidden bg-white shadow-2xs';
-    div.innerHTML = `
-      <input type="hidden" class="grid-photo-url" value="${url}"/>
-      <img src="${url}" class="w-full h-20 object-cover"/>
-      ${idx === 0 ? '<span class="absolute top-1 left-1 bg-brand-800 text-white text-[9px] px-1 font-bold">封面</span>' : ''}
-      <button type="button" onclick="removePhotoAndStorage('${url}', this)" class="cursor-pointer absolute top-1 right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">×</button>
-    `;
-    container.appendChild(div);
-  });
-}
+    function renderPhotoGrid(photoUrls) {
+      const container = document.getElementById('photo-grid');
+      container.innerHTML = '';
+      photoUrls.forEach((url, idx) => {
+        const div = document.createElement('div');
+        div.className = 'relative group border border-slate-300 rounded overflow-hidden bg-white shadow-2xs';
+        div.innerHTML = `
+          <input type="hidden" class="grid-photo-url" value="${url}"/>
+          <img src="${url}" onclick="openImageModal('${url}')" class="w-full h-20 object-cover cursor-pointer"/>
+          ${idx === 0 ? '<span class="absolute top-1 left-1 bg-brand-800 text-white text-[9px] px-1 font-bold">封面</span>' : ''}
+          <button type="button" onclick="removePhotoAndStorage('${url}', this)" class="cursor-pointer absolute top-1 right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">×</button>
+        `;
+        container.appendChild(div);
+      });
+    }
 
-// Handler to delete from UI and Supabase Storage simultaneously
-async function removePhotoAndStorage(url, buttonElement) {
-  if (confirm('確定要從雲端刪除這張相片嗎？')) {
-    await deletePhotoFromSupabaseStorage(url);
-    buttonElement.closest('.relative').remove();
-    alert('相片已從雲端儲存空間刪除！');
-  }
-}
+    async function removePhotoAndStorage(url, buttonElement) {
+      if (confirm('確定要從雲端永久刪除這張相片嗎？')) {
+        await deletePhotoFromSupabaseStorage(url);
+        buttonElement.closest('.relative').remove();
+
+        const photoEls = document.querySelectorAll('.grid-photo-url');
+        const remainingPhotos = Array.from(photoEls).map(el => el.value);
+        renderPhotoGrid(remainingPhotos);
+
+        // Immediately sync the updated photo array and edit time to Supabase
+        const propertyRef = document.getElementById('edit-ref').value;
+        const existingProp = properties.find(p => p.ref === propertyRef);
+        if (existingProp) {
+          existingProp.photos = remainingPhotos;
+          existingProp.updatedAt = new Date().toISOString();
+          savePropertiesToStorage();
+          await syncPropertyToSupabase(existingProp);
+          document.getElementById('form-title-text').innerHTML = `<i class="fa-solid fa-pen-to-square text-brand-800"></i> 編輯樓盤 : ${existingProp.ref} (${existingProp.titleZh}) — 最後更新: ${formatDateTime(existingProp.updatedAt)}`;
+          renderListings();
+        }
+
+        alert('相片已從雲端儲存空間及樓盤記錄中刪除！');
+      }
+    }
+
     function addPhotoUrlPrompt() {
       const url = prompt('請輸入相片網址 (Image URL):', "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=60");
       if (url && url.trim() !== '') {
         const photoEls = document.querySelectorAll('.grid-photo-url');
         const list = Array.from(photoEls).map(el => el.value);
         list.push(url.trim());
-        renderPhotoGrid(list);
+        renderPhotoGrid(Array.from(new Set(list)));
       }
     }
 
@@ -1258,14 +1352,14 @@ async function removePhotoAndStorage(url, buttonElement) {
       }
       properties.forEach(p => {
         let opt = document.createElement('option');
-        opt.value = p.id;
+        opt.value = p.ref;
         opt.innerText = `${p.ref} - ${p.titleZh}`;
         select.appendChild(opt);
       });
     }
 
-    function selectForEAA(id) {
-      document.getElementById('eaa-property-select').value = id;
+    function selectForEAA(refOrId) {
+      document.getElementById('eaa-property-select').value = refOrId;
       switchTab('eaa');
     }
 
@@ -1276,7 +1370,7 @@ async function removePhotoAndStorage(url, buttonElement) {
 
     function renderEAAForm() {
       const selectedId = document.getElementById('eaa-property-select').value;
-      const p = properties.find(item => item.id === selectedId || item.ref === selectedId) || properties[0];
+      const p = properties.find(item => item.ref === selectedId || item.id === selectedId) || properties[0];
       const formContainer = document.getElementById('printable-form');
       if (!p) {
         formContainer.innerHTML = '<div class="text-center text-slate-400 py-8">請先新增樓盤。</div>';
@@ -1293,7 +1387,7 @@ async function removePhotoAndStorage(url, buttonElement) {
           <p><strong>地區 / 地址:</strong> ${p.district} - ${p.block || ''} ${p.floor || ''} ${p.unit || ''}</p>
           <p><strong>實用面積:</strong> ${p.saleableArea} sq.ft | <strong>叫價:</strong> ${formatPriceDisplay(p)}</p>
           <p><strong>聯絡人:</strong> ${p.contactName || '--'} (${p.contactPhone || '--'}) - 牌號: ${p.agentLicence || '--'}</p>
-          <p><strong>更新日期:</strong> ${p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '--'}</p>
+          <p><strong>最後更新時間:</strong> ${formatDateTime(p.updatedAt)}</p>
         </div>
       `;
     }
