@@ -1693,7 +1693,6 @@ async function syncPropertyToSupabase(prop) {
     direction: prop.direction || '',
     owner_name: prop.ownerName || '',
     owner_phone: prop.ownerPhone || '',
-    car_park: prop.carPark || '',
     notes: prop.notes || '',
     photos: Array.isArray(prop.photos) ? Array.from(new Set(prop.photos)) : [],
     updated_at: prop.updatedAt || new Date().toISOString()
