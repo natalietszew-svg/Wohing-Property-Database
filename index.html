@@ -1184,23 +1184,53 @@
 
       alert('相片已成功上傳至專屬資料夾並同步至雲端！');
     }
+    async function deletePhotoFromSupabaseStorage(photoUrl) {
+  if (!supabaseClient || !photoUrl) return;
+  
+  try {
+    const bucketName = 'property-photos';
+    const marker = `/public/${bucketName}/`;
+    const markerIndex = photoUrl.indexOf(marker);
+    
+    if (markerIndex === -1) return;
+    const filePath = decodeURIComponent(photoUrl.substring(markerIndex + marker.length));
 
-    function renderPhotoGrid(photoUrls) {
-      const container = document.getElementById('photo-grid');
-      container.innerHTML = '';
-      photoUrls.forEach((url, idx) => {
-        const div = document.createElement('div');
-        div.className = 'relative group border border-slate-300 rounded overflow-hidden bg-white shadow-2xs';
-        div.innerHTML = `
-          <input type="hidden" class="grid-photo-url" value="${url}"/>
-          <img src="${url}" class="w-full h-20 object-cover"/>
-          ${idx === 0 ? '<span class="absolute top-1 left-1 bg-brand-800 text-white text-[9px] px-1 font-bold">封面</span>' : ''}
-          <button type="button" onclick="this.closest('.relative').remove()" class="cursor-pointer absolute top-1 right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">×</button>
-        `;
-        container.appendChild(div);
-      });
+    const { error } = await supabaseClient.storage
+      .from(bucketName)
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Failed to delete file from Supabase storage:', error.message);
     }
+  } catch (err) {
+    console.error('Error deleting photo from storage:', err);
+  }
+}
 
+   function renderPhotoGrid(photoUrls) {
+  const container = document.getElementById('photo-grid');
+  container.innerHTML = '';
+  photoUrls.forEach((url, idx) => {
+    const div = document.createElement('div');
+    div.className = 'relative group border border-slate-300 rounded overflow-hidden bg-white shadow-2xs';
+    div.innerHTML = `
+      <input type="hidden" class="grid-photo-url" value="${url}"/>
+      <img src="${url}" class="w-full h-20 object-cover"/>
+      ${idx === 0 ? '<span class="absolute top-1 left-1 bg-brand-800 text-white text-[9px] px-1 font-bold">封面</span>' : ''}
+      <button type="button" onclick="removePhotoAndStorage('${url}', this)" class="cursor-pointer absolute top-1 right-1 bg-red-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">×</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// Handler to delete from UI and Supabase Storage simultaneously
+async function removePhotoAndStorage(url, buttonElement) {
+  if (confirm('確定要從雲端刪除這張相片嗎？')) {
+    await deletePhotoFromSupabaseStorage(url);
+    buttonElement.closest('.relative').remove();
+    alert('相片已從雲端儲存空間刪除！');
+  }
+}
     function addPhotoUrlPrompt() {
       const url = prompt('請輸入相片網址 (Image URL):', "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=60");
       if (url && url.trim() !== '') {
