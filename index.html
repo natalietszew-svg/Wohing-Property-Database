@@ -1673,17 +1673,51 @@ async function deleteProperty(refOrId) {
 // ==========================================
 // 5. SYNC TO SUPABASE (Always Locks id === ref so Duplicates Can Never Form)
 // ==========================================
-// 8. Lock id === ref on every upsert AND include block, floor, and unit
+// 8. Helper to find the Block, Floor, and Unit inputs in the Edit form
+  function getBlockFloorUnitInputs() {
+    const editView = document.getElementById('view-edit') || document;
+    let blockEl = document.getElementById('edit-block') || editView.querySelector('[id*="block" i], [name*="block" i], [placeholder*="座"], [placeholder*="棟"], [placeholder*="村"]');
+    let floorEl = document.getElementById('edit-floor') || editView.querySelector('[id*="floor" i], [name*="floor" i], [placeholder*="樓層"], [placeholder*="層"]');
+    let unitEl  = document.getElementById('edit-unit')  || editView.querySelector('[id*="unit" i], [name*="unit" i], [placeholder*="單位"], [placeholder*="室"]');
+
+    // Fallback: match by label text ("座 / 棟 / 村數", "樓層", "單位")
+    if (!blockEl || !floorEl || !unitEl) {
+      const labels = editView.querySelectorAll('label');
+      labels.forEach(lbl => {
+        const txt = (lbl.textContent || '').trim();
+        const input = lbl.parentElement ? lbl.parentElement.querySelector('input, select') : null;
+        if (!input) return;
+        if (!blockEl && (txt.includes('座') || txt.includes('棟') || txt.includes('村'))) blockEl = input;
+        if (!floorEl && txt.includes('樓層')) floorEl = input;
+        if (!unitEl  && txt.includes('單位')) unitEl = input;
+      });
+    }
+    return { blockEl, floorEl, unitEl };
+  }
+
+  // 9. Lock id === ref on every upsert AND always save block, floor, and unit to Supabase + localStorage
   async function syncPropertyToSupabase(prop) {
     if (!supabaseClient || !prop) return;
     const stableSku = (prop.ref || prop.id || getNextSku()).trim();
     prop.id = stableSku;
     prop.ref = stableSku;
 
-    // Fallback to reading the form inputs directly if prop.block/floor/unit weren't attached yet
-    const blockVal = prop.block !== undefined ? prop.block : (document.getElementById('edit-block')?.value || '');
-    const floorVal = prop.floor !== undefined ? prop.floor : (document.getElementById('edit-floor')?.value || '');
-    const unitVal  = prop.unit  !== undefined ? prop.unit  : (document.getElementById('edit-unit')?.value  || '');
+    const { blockEl, floorEl, unitEl } = getBlockFloorUnitInputs();
+    // Always capture the live input values if editing this property right now
+    const currentEditRef = document.getElementById('edit-ref')?.value?.trim();
+    if (currentEditRef === stableSku) {
+      if (blockEl && blockEl.value !== undefined) prop.block = blockEl.value.trim();
+      if (floorEl && floorEl.value !== undefined) prop.floor = floorEl.value.trim();
+      if (unitEl  && unitEl.value  !== undefined) prop.unit  = unitEl.value.trim();
+    }
+
+    prop.block = prop.block || '';
+    prop.floor = prop.floor || '';
+    prop.unit  = prop.unit  || '';
+
+    if (typeof savePropertiesToStorage === 'function') {
+      savePropertiesToStorage();
+    }
 
     const singlePayload = {
       id: stableSku,
@@ -1693,9 +1727,9 @@ async function deleteProperty(refOrId) {
       district: prop.district || '',
       type: prop.type || '',
       status: prop.status || 'Sale',
-      block: blockVal,
-      floor: floorVal,
-      unit: unitVal,
+      block: prop.block,
+      floor: prop.floor,
+      unit: prop.unit,
       price: Number(prop.price) || 0,
       saleable_area: Number(prop.saleableArea) || 0,
       gross_area: Number(prop.grossArea) || 0,
@@ -1713,10 +1747,66 @@ async function deleteProperty(refOrId) {
       .upsert(singlePayload, { onConflict: 'id' });
 
     if (error) {
-      console.error('Server sync error:', error.message);
+      console.error('Supabase sync error:', error.message);
       alert('【雲端同步失敗】Error: ' + error.message);
     }
   }
+
+  // 10. Ensure editing a property populates the 座/棟/村數, 樓層, and 單位 input boxes
+  const _originalEditProperty = typeof editProperty === 'function' ? editProperty : null;
+  if (_originalEditProperty) {
+    editProperty = function(refOrId) {
+      _originalEditProperty(refOrId);
+      const prop = properties.find(p => p.ref === refOrId || p.id === refOrId);
+      if (prop) {
+        const { blockEl, floorEl, unitEl } = getBlockFloorUnitInputs();
+        if (blockEl) blockEl.value = prop.block || '';
+        if (floorEl) floorEl.value = prop.floor || '';
+        if (unitEl)  unitEl.value  = prop.unit  || '';
+      }
+    };
+  }
+
+  // 11. Restore block, floor, and unit from Supabase every time the page loads/reloads
+  async function restoreBlockFloorUnitFromSupabase() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient
+      .from('properties')
+      .select('id, ref, block, floor, unit');
+    if (error || !data) return;
+
+    let updated = false;
+    data.forEach(row => {
+      const sku = (row.ref || row.id || '').trim();
+      const target = properties.find(p => p.ref === sku || p.id === sku);
+      if (target) {
+        target.block = row.block || target.block || '';
+        target.floor = row.floor || target.floor || '';
+        target.unit  = row.unit  || target.unit  || '';
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      if (typeof savePropertiesToStorage === 'function') savePropertiesToStorage();
+      if (typeof renderListings === 'function') renderListings();
+      if (typeof renderEAAForm === 'function') renderEAAForm();
+    }
+  }
+
+  const _originalLoadPropertiesData = typeof loadPropertiesData === 'function' ? loadPropertiesData : null;
+  if (_originalLoadPropertiesData) {
+    loadPropertiesData = async function(...args) {
+      const res = await _originalLoadPropertiesData.apply(this, args);
+      await restoreBlockFloorUnitFromSupabase();
+      return res;
+    };
+  }
+
+  // Also run once automatically after initial page load completes
+  window.addEventListener('load', () => {
+    setTimeout(restoreBlockFloorUnitFromSupabase, 600);
+  });
   </script>
 </body>
 </html>
