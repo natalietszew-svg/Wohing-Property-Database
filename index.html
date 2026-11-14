@@ -1673,40 +1673,50 @@ async function deleteProperty(refOrId) {
 // ==========================================
 // 5. SYNC TO SUPABASE (Always Locks id === ref so Duplicates Can Never Form)
 // ==========================================
-async function syncPropertyToSupabase(prop) {
-  if (!supabaseClient || !prop) return;
-  const stableSku = (prop.ref || prop.id || getNextSku()).trim();
-  prop.id = stableSku;
-  prop.ref = stableSku;
+// 8. Lock id === ref on every upsert AND include block, floor, and unit
+  async function syncPropertyToSupabase(prop) {
+    if (!supabaseClient || !prop) return;
+    const stableSku = (prop.ref || prop.id || getNextSku()).trim();
+    prop.id = stableSku;
+    prop.ref = stableSku;
 
-  const singlePayload = {
-    id: stableSku,
-    ref: stableSku,
-    title_zh: prop.titleZh || '',
-    title_en: prop.titleEn || '',
-    district: prop.district || '',
-    type: prop.type || '',
-    status: prop.status || 'Sale',
-    price: Number(prop.price) || 0,
-    saleable_area: Number(prop.saleableArea) || 0,
-    gross_area: Number(prop.grossArea) || 0,
-    direction: prop.direction || '',
-    owner_name: prop.ownerName || '',
-    owner_phone: prop.ownerPhone || '',
-    notes: prop.notes || '',
-    photos: Array.isArray(prop.photos) ? Array.from(new Set(prop.photos)) : [],
-    updated_at: prop.updatedAt || new Date().toISOString()
-  };
+    // Fallback to reading the form inputs directly if prop.block/floor/unit weren't attached yet
+    const blockVal = prop.block !== undefined ? prop.block : (document.getElementById('edit-block')?.value || '');
+    const floorVal = prop.floor !== undefined ? prop.floor : (document.getElementById('edit-floor')?.value || '');
+    const unitVal  = prop.unit  !== undefined ? prop.unit  : (document.getElementById('edit-unit')?.value  || '');
 
-  const { error } = await supabaseClient
-    .from('properties')
-    .upsert(singlePayload, { onConflict: 'id' });
+    const singlePayload = {
+      id: stableSku,
+      ref: stableSku,
+      title_zh: prop.titleZh || '',
+      title_en: prop.titleEn || '',
+      district: prop.district || '',
+      type: prop.type || '',
+      status: prop.status || 'Sale',
+      block: blockVal,
+      floor: floorVal,
+      unit: unitVal,
+      price: Number(prop.price) || 0,
+      saleable_area: Number(prop.saleableArea) || 0,
+      gross_area: Number(prop.grossArea) || 0,
+      direction: prop.direction || '',
+      owner_name: prop.ownerName || '',
+      owner_phone: prop.ownerPhone || '',
+      car_park: prop.carPark || '',
+      notes: prop.notes || '',
+      photos: Array.isArray(prop.photos) ? Array.from(new Set(prop.photos)) : [],
+      updated_at: prop.updatedAt || new Date().toISOString()
+    };
 
-  if (error) {
-    console.error('Supabase sync error:', error.message);
-    alert('【雲端同步失敗】Error: ' + error.message);
+    const { error } = await supabaseClient
+      .from('properties')
+      .upsert(singlePayload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Server sync error:', error.message);
+      alert('【雲端同步失敗】Error: ' + error.message);
+    }
   }
-}
   </script>
 </body>
 </html>
