@@ -1807,6 +1807,127 @@ async function deleteProperty(refOrId) {
   window.addEventListener('load', () => {
     setTimeout(restoreBlockFloorUnitFromSupabase, 600);
   });
+    // 9. Lock id === ref on every upsert AND include owner/agent contact fields
+  async function syncPropertyToSupabase(prop) {
+    if (!supabaseClient || !prop) return;
+    const stableSku = (prop.ref || prop.id || getNextSku()).trim();
+    prop.id = stableSku;
+    prop.ref = stableSku;
+
+    const { blockEl, floorEl, unitEl } = getBlockFloorUnitInputs();
+    const currentEditRef = document.getElementById('edit-ref')?.value?.trim();
+    if (currentEditRef === stableSku) {
+      if (blockEl && blockEl.value !== undefined) prop.block = blockEl.value.trim();
+      if (floorEl && floorEl.value !== undefined) prop.floor = floorEl.value.trim();
+      if (unitEl  && unitEl.value  !== undefined) prop.unit  = unitEl.value.trim();
+      
+      // Capture live values from the owner / agent input fields
+      prop.contactName  = document.getElementById('edit-contactName')?.value?.trim() || '';
+      prop.contactPhone = document.getElementById('edit-contactPhone')?.value?.trim() || '';
+      prop.agentLicence = document.getElementById('edit-agentLicence')?.value?.trim() || '';
+      prop.notes        = document.getElementById('edit-notes')?.value?.trim() || '';
+    }
+
+    prop.block = prop.block || '';
+    prop.floor = prop.floor || '';
+    prop.unit  = prop.unit  || '';
+
+    if (typeof savePropertiesToStorage === 'function') {
+      savePropertiesToStorage();
+    }
+
+    const singlePayload = {
+      id: stableSku,
+      ref: stableSku,
+      title_zh: prop.titleZh || '',
+      title_en: prop.titleEn || '',
+      district: prop.district || '',
+      type: prop.type || '',
+      status: prop.status || 'Sale',
+      block: prop.block,
+      floor: prop.floor,
+      unit: prop.unit,
+      price: Number(prop.price) || 0,
+      saleable_area: Number(prop.saleableArea) || 0,
+      gross_area: Number(prop.grossArea) || 0,
+      view: prop.view || '',
+      layout: prop.layout || '',
+      mgmt: prop.mgmt || '',
+      // Ensure these match your Supabase columns (contact_name / owner_name, phone, license, remarks)
+      contact_name: prop.contactName || '',
+      contact_phone: prop.contactPhone || '',
+      agent_licence: prop.agentLicence || '',
+      notes: prop.notes || '',
+      photos: Array.isArray(prop.photos) ? Array.from(new Set(prop.photos)) : [],
+      updated_at: prop.updatedAt || new Date().toISOString()
+    };
+
+    const { error } = await supabaseClient
+      .from('properties')
+      .upsert(singlePayload, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Supabase sync error:', error.message);
+      alert('【雲端同步失敗】Error: ' + error.message);
+    }
+  }
+
+  // 10. Ensure editing a property populates all input boxes, including owner/agent info
+  const _originalEditProperty = typeof editProperty === 'function' ? editProperty : null;
+  if (_originalEditProperty) {
+    editProperty = function(refOrId) {
+      _originalEditProperty(refOrId);
+      const prop = properties.find(p => p.ref === refOrId || p.id === refOrId);
+      if (prop) {
+        const { blockEl, floorEl, unitEl } = getBlockFloorUnitInputs();
+        if (blockEl) blockEl.value = prop.block || '';
+        if (floorEl) floorEl.value = prop.floor || '';
+        if (unitEl)  unitEl.value  = prop.unit  || '';
+
+        // Populate contact & agent fields on edit
+        const contactNameEl = document.getElementById('edit-contactName');
+        const contactPhoneEl = document.getElementById('edit-contactPhone');
+        const agentLicenceEl = document.getElementById('edit-agentLicence');
+        const notesEl = document.getElementById('edit-notes');
+
+        if (contactNameEl) contactNameEl.value = prop.contactName || '';
+        if (contactPhoneEl) contactPhoneEl.value = prop.contactPhone || '';
+        if (agentLicenceEl) agentLicenceEl.value = prop.agentLicence || '';
+        if (notesEl) notesEl.value = prop.notes || '';
+      }
+    };
+  }
+
+  // 11. Restore all fields including contact and license info from Supabase on reload
+  async function restoreBlockFloorUnitFromSupabase() {
+    if (!supabaseClient) return;
+    const { data, error } = await supabaseClient
+      .from('properties')
+      .select('*');
+    if (error || !data) return;
+
+    let updated = false;
+    data.forEach(row => {
+      const sku = (row.ref || row.id || '').trim();
+      const target = properties.find(p => p.ref === sku || p.id === sku);
+      if (target) {
+        target.block = row.block || target.block || '';
+        target.floor = row.floor || target.floor || '';
+        target.unit  = row.unit  || target.unit  || '';
+        target.contactName = row.contact_name || row.owner_name || target.contactName || '';
+        target.contactPhone = row.contact_phone || row.owner_phone || target.contactPhone || '';
+        target.agentLicence = row.agent_licence || target.agentLicence || '';
+        target.notes = row.notes || target.notes || '';
+        updated = true;
+      }
+    });
+
+    if (updated) {
+      if (typeof savePropertiesToStorage === 'function') savePropertiesToStorage();
+      if (typeof renderListings === 'function') renderListings();
+      if (typeof renderEAAForm === 'function') renderEAAForm();
+    }
+  }
   </script>
 </body>
 </html>
