@@ -1713,10 +1713,7 @@ if (!blockEl || !floorEl || !unitEl) {
     }
     return { blockEl, floorEl, unitEl };
   }
-
-  // 👇 PASTE STARTING HERE (Replacing the old #9, #10, and #11) 👇
-
-  // 9. Lock id === ref on every upsert AND include owner/agent contact fields
+// 9. Lock id === ref on every upsert AND include owner/agent contact fields
   async function syncPropertyToSupabase(prop) {
     if (!supabaseClient || !prop) return null;
     const stableSku = (prop.ref || prop.id || getNextSku()).trim();
