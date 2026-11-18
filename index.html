@@ -918,11 +918,11 @@
         return true;
       });
 
-      if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="p-8 text-center text-slate-400 font-medium">目前沒有符合條件的樓盤記錄。</td></tr>`;
-        document.getElementById('showing-count').innerText = `顯示 0 個樓盤`;
-        return;
-      }
+  if (filtered.length === 0) {
+  tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-slate-400 font-medium">目前沒有符合條件的樓盤記錄。</td></tr>`;
+  document.getElementById('showing-count').innerText = `顯示 0 個樓盤`;
+  return;
+}
 
       filtered.forEach(p => {
         let priceDisplay = formatPriceDisplay(p);
