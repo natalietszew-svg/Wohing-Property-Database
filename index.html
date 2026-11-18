@@ -212,6 +212,7 @@
                 <th class="p-3.5" data-i18n="th_area">實用 / 建築面積</th>
                 <th class="p-3.5" data-i18n="th_price">叫價 / 租金</th>
                 <th class="p-3.5" data-i18n="th_sqft">實用呎價</th>
+                <th class="p-3.5" data-i18n="th_contact">聯絡人 / 牌號</th>
                 <th class="p-3.5 text-center" data-i18n="th_photos">相片</th>
                 <th class="p-3.5" data-i18n="th_updated">最後更新時間</th>
                 <th class="p-3.5 text-center" data-i18n="th_actions">操作</th>
@@ -956,6 +957,10 @@
               <span class="absolute -top-1 -right-1 bg-brand-800 text-white text-[9px] w-4 h-4 flex items-center justify-center font-bold rounded-full">${p.photos?.length || 0}</span>
             </button>
           </td>
+          <td class="p-3.5">
+  <div class="font-bold text-slate-900">${p.contactName || '--'}</div>
+  <div class="text-xs text-slate-500">${p.contactPhone || ''} | ${p.agentLicence || ''}</div>
+</td>
           <td class="p-3.5 text-xs text-slate-600 font-medium">${formattedDate}</td>
           <td class="p-3.5 text-center">
             <div class="flex items-center justify-center gap-2">
